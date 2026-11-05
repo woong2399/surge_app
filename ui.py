@@ -7,24 +7,23 @@ import streamlit as st
 UP, MUTED = "#d6372b", "#6a6a6a"  # 한국식: 상승 빨강
 
 CSS = """<style>
-.block-container{padding:3.5rem 1rem 3rem;max-width:720px}
-h1{font-size:22px!important}h2{font-size:16px!important;margin-top:1.2rem!important}
-.it{margin:14px 0 2px;font-size:16px}.it small{color:#6a6a6a;font-size:12px;margin-left:4px}
+.block-container{padding:5.5rem 1rem 3rem;max-width:720px}
+h1{font-size:24px!important;line-height:1.35!important;padding-top:.2rem!important}h2{font-size:16px!important;margin-top:1.2rem!important}
+.it{margin:18px 0 4px;font-size:17px}.it small{color:#6a6a6a;font-size:12px;margin-left:4px}
 .tag{font-size:10px;border:1px solid #ccc;border-radius:4px;padding:0 4px;color:#6a6a6a;margin-left:4px}
-.chip{display:inline-block;font-size:11px;background:#eef1f6;color:#33415c;border-radius:10px;padding:1px 8px;margin:2px 4px 0 0}
-.sub{margin:2px 0 0 14px;font-size:13px;line-height:1.5}.sub a{text-decoration:none}
-.th{margin:3px 0 0 14px}
-.box{border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.55;white-space:pre-wrap}
+.chip{display:inline-block;font-size:15px;font-weight:600;background:#e3ebfb;color:#1d3a78;border-radius:14px;padding:3px 12px;margin:4px 6px 2px 0;line-height:1.4}
+.sub{margin:4px 0 0 14px;font-size:15px;line-height:1.6}.sub a{text-decoration:none}
+.th{margin:6px 0 0 14px}
+.box{background:rgba(128,128,128,.08);border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.55;white-space:pre-wrap}
 </style>"""
 
 
 def setup(title):
-    st.set_page_config(page_title=title, layout="centered")
     st.markdown(CSS, unsafe_allow_html=True)
     a, b, c = st.columns(3)  # 폰에서는 옆 메뉴가 접혀 있어서 장 이동 링크를 위에 둔다
-    a.page_link("app.py", label="날짜별")
-    b.page_link("pages/2_종목별.py", label="종목별")
-    c.page_link("pages/3_테마별.py", label="테마별")
+    a.page_link("views/issues.py", label="이슈")
+    b.page_link("views/stocks.py", label="종목")
+    c.page_link("views/themes.py", label="테마")
     st.title(title)
 
 

@@ -1,4 +1,4 @@
-"""3장 — 테마별 분류 화면."""
+"""테마 — 옆 목록에서 테마를 고르면 그 테마의 종목과 날짜별 이슈가 나온다."""
 import html
 import sys
 from pathlib import Path
@@ -9,34 +9,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import db  # noqa: E402
 import ui  # noqa: E402
 
-ui.setup("테마별")
+ui.setup("테마")
 ui.need_token()
 
-
-def _themes():
-    return db.all_themes()
-
-
-def _events(theme):
-    return db.theme_events(theme)
-
-
-themes = _themes()
+themes = db.all_themes()
 if not themes:
-    st.info("아직 입력된 테마가 없습니다. 시트 이력 탭의 테마 열을 채운 뒤 갱신하면 여기에 나옵니다.")
+    st.info("아직 입력된 테마가 없습니다. 시트 이력 탭의 테마 열을 채우면 여기에 나옵니다.")
     st.stop()
 
-theme = st.selectbox("테마", themes, index=None, placeholder="테마 선택 (입력해서 찾기)")
+with st.sidebar:
+    q = st.text_input("테마 찾기", placeholder="테마 이름").strip().lower()
+    shown = [t for t in themes if q in t.lower()]
+    if not shown:
+        st.caption("찾는 테마가 없습니다.")
+    theme = st.radio("테마 목록", shown, label_visibility="collapsed") if shown else None
+
 if not theme:
-    st.caption("테마를 고르면 그 테마로 분류된 종목과 이슈가 나옵니다.")
+    st.write("옆 목록에서 테마를 고르세요. 폰에서는 왼쪽 위 `>>` 를 누르면 목록이 열립니다.")
     st.stop()
 
-events = _events(theme)
+events = db.theme_events(theme)
 stocks = []
 for e in events:
     if e["name"] not in stocks:
         stocks.append(e["name"])
 
+st.subheader(theme)
 st.markdown("**종목**")
 st.markdown("".join(f"<span class='chip'>{html.escape(s)}</span>" for s in stocks), unsafe_allow_html=True)
 
