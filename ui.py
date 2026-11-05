@@ -7,7 +7,7 @@ import streamlit as st
 UP, MUTED = "#d6372b", "#6a6a6a"  # 한국식: 상승 빨강
 
 CSS = """<style>
-.block-container{padding:1rem 1rem 3rem;max-width:720px}
+.block-container{padding:3.5rem 1rem 3rem;max-width:720px}
 h1{font-size:22px!important}h2{font-size:16px!important;margin-top:1.2rem!important}
 .it{margin:14px 0 2px;font-size:16px}.it small{color:#6a6a6a;font-size:12px;margin-left:4px}
 .tag{font-size:10px;border:1px solid #ccc;border-radius:4px;padding:0 4px;color:#6a6a6a;margin-left:4px}
@@ -21,6 +21,10 @@ h1{font-size:22px!important}h2{font-size:16px!important;margin-top:1.2rem!import
 def setup(title):
     st.set_page_config(page_title=title, layout="centered")
     st.markdown(CSS, unsafe_allow_html=True)
+    a, b, c = st.columns(3)  # 폰에서는 옆 메뉴가 접혀 있어서 장 이동 링크를 위에 둔다
+    a.page_link("app.py", label="날짜별")
+    b.page_link("pages/2_종목별.py", label="종목별")
+    c.page_link("pages/3_테마별.py", label="테마별")
     st.title(title)
 
 
