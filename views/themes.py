@@ -1,5 +1,4 @@
-"""테마 — 옆 목록에서 테마를 고르면 그 테마의 종목과 날짜별 이슈가 나온다."""
-import html
+"""테마 — 맨 위 목록에서 테마를 고르면 그 테마의 종목과 날짜별 이슈가 나온다. 검색은 목록을 좁힌다."""
 import sys
 from pathlib import Path
 
@@ -17,15 +16,13 @@ if not themes:
     st.info("아직 입력된 테마가 없습니다. 시트 이력 탭의 테마 열을 채우면 여기에 나옵니다.")
     st.stop()
 
-with st.sidebar:
-    q = st.text_input("테마 찾기", placeholder="테마 이름").strip().lower()
-    shown = [t for t in themes if q in t.lower()]
-    if not shown:
-        st.caption("찾는 테마가 없습니다.")
-    theme = st.radio("테마 목록", shown, label_visibility="collapsed") if shown else None
+c1, c2 = st.columns([1, 1.4])
+q = c2.text_input("검색", placeholder="🔍 테마 검색", label_visibility="collapsed", key="theme_q").strip().lower()
+shown = [t for t in themes if q in t.lower()]
+theme = c1.selectbox("테마", shown, label_visibility="collapsed", key="theme_pick") if shown else None
 
 if not theme:
-    ui.setup("테마", "옆 목록에서 테마를 고르세요. 폰에서는 왼쪽 위 » 를 누르면 목록이 열립니다.")
+    ui.setup("테마", "찾는 테마가 없습니다." if q else None)
     st.stop()
 
 events = db.theme_events(theme)

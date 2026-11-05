@@ -1,4 +1,4 @@
-"""종목 — 옆 목록에서 종목을 고르면 테마, 종목 정보, 메모, 관련 이슈가 나온다."""
+"""종목 — 맨 위 목록에서 종목을 고르면 테마, 종목 정보, 메모, 관련 이슈가 나온다. 검색은 목록을 좁힌다."""
 import html
 import sys
 from pathlib import Path
@@ -13,19 +13,18 @@ ui.need_token()
 
 stocks = db.stocks()
 if not stocks:
+    ui.setup("종목")
     st.info("아직 올라온 종목이 없습니다.")
     st.stop()
 
-with st.sidebar:
-    q = st.text_input("종목 찾기", placeholder="이름·코드").strip().lower()
-    shown = [s for s in stocks if q in f"{s['name']} {s['code']}".lower()]
-    labels = {f"{s['name']}  {s['code']}": s for s in shown}
-    if not labels:
-        st.caption("찾는 종목이 없습니다.")
-    choice = st.radio("종목 목록", list(labels), label_visibility="collapsed") if labels else None
+c1, c2 = st.columns([1, 1.4])
+q = c2.text_input("검색", placeholder="🔍 종목명·코드 검색", label_visibility="collapsed", key="stock_q").strip().lower()
+shown = [s for s in stocks if q in f"{s['name']} {s['code']}".lower()]
+labels = {f"{s['name']}  {s['code']}": s for s in shown}
+choice = c1.selectbox("종목", list(labels), label_visibility="collapsed", key="stock_pick") if labels else None
 
 if not choice:
-    ui.setup("종목", "옆 목록에서 종목을 고르세요. 폰에서는 왼쪽 위 » 를 누르면 목록이 열립니다.")
+    ui.setup("종목", "찾는 종목이 없습니다." if q else None)
     st.stop()
 
 code, name = labels[choice]["code"], labels[choice]["name"]
