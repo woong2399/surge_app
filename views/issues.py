@@ -1,6 +1,7 @@
 """이슈 — 날짜별 종목과 이슈."""
 import html
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -9,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import db  # noqa: E402
 import ui  # noqa: E402
 
-ui.setup("이슈")
 ui.need_token()
 
 dates = db.dates()
@@ -17,29 +17,23 @@ if not dates:
     st.info("아직 올라온 날짜가 없습니다.")
     st.stop()
 
-c1, c2 = st.columns([1, 2])
-day = c1.selectbox("날짜", dates)
-q = c2.text_input("검색", placeholder="종목명·코드·이슈·테마").strip().lower()
+WD = "월화수목금토일"
+c1, c2 = st.columns([1, 1.4])
+day = c1.selectbox("날짜", dates, label_visibility="collapsed")
+q = c2.text_input("검색", placeholder="🔍 종목·테마·이슈 검색", label_visibility="collapsed").strip().lower()
 
+d = datetime.strptime(day, "%Y-%m-%d")
 rows = db.day_rows(day)
 if q:
     rows = [r for r in rows if q in f"{r['name']} {r['code']} {r['telegram']} {r['theme']}".lower()]
 
-st.caption(f"{day} · {len(rows)}종목 · 등락률 큰 순")
+ui.setup(f"{d.month}월 {d.day}일 {WD[d.weekday()]}요일", f"{len(rows)}종목 · 등락률 높은 순")
 if not rows:
-    st.write("조건에 맞는 종목이 없습니다.")
+    st.markdown("<div class='empty'>조건에 맞는 종목이 없습니다.</div>", unsafe_allow_html=True)
 
 for r in rows:
-    tag = "<span class='tag'>텔레그램만</span>" if r["grp"] == "telegram" else ""
-    st.markdown(
-        f"<div class='it'><b>{html.escape(r['name'])}</b><small>{r['code']}</small> "
-        f"{ui.pct_html(r['pct'])}<small>{ui.amount_text(r['amount_est'])}</small>{tag}</div>",
-        unsafe_allow_html=True,
+    ui.card(
+        r["name"], code=r["code"], pct=r["pct"], meta=ui.amount_text(r["amount_est"]),
+        tag=r["grp"] == "telegram", themes=db.split_themes(r["theme"]),
+        text=r["telegram"], news=r["news"],
     )
-    themes = db.split_themes(r["theme"])
-    if themes:
-        st.markdown(f"<div class='th'>{ui.chips(themes)}</div>", unsafe_allow_html=True)
-    if r["telegram"]:
-        st.markdown(f"<div class='sub'>{html.escape(r['telegram'])}</div>", unsafe_allow_html=True)
-    if r["news"]:
-        st.markdown(ui.news_html(r["news"]), unsafe_allow_html=True)

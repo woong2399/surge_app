@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import db  # noqa: E402
 import ui  # noqa: E402
 
-ui.setup("종목")
 ui.need_token()
 
 stocks = db.stocks()
@@ -26,42 +25,33 @@ with st.sidebar:
     choice = st.radio("종목 목록", list(labels), label_visibility="collapsed") if labels else None
 
 if not choice:
-    st.write("옆 목록에서 종목을 고르세요. 폰에서는 왼쪽 위 `>>` 를 누르면 목록이 열립니다.")
+    ui.setup("종목", "옆 목록에서 종목을 고르세요. 폰에서는 왼쪽 위 » 를 누르면 목록이 열립니다.")
     st.stop()
 
 code, name = labels[choice]["code"], labels[choice]["name"]
 card = db.stock_card(code)
-st.subheader(name)
-st.caption(code)
+ui.setup(name, code)
 
-st.markdown("**테마**")
+st.markdown("<div class='sec'>테마</div>", unsafe_allow_html=True)
 if card["themes"]:
-    st.markdown(f"<div>{ui.chips(card['themes'])}</div>", unsafe_allow_html=True)
+    st.markdown(ui.chips(card["themes"]).replace("class='chips'", "class='chips' style='margin-top:0'"), unsafe_allow_html=True)
 else:
-    st.write("아직 입력된 테마가 없습니다.")
+    st.markdown("<div class='empty'>아직 입력된 테마가 없습니다.</div>", unsafe_allow_html=True)
 
-st.markdown("**종목 정보**")
+st.markdown("<div class='sec'>종목 정보</div>", unsafe_allow_html=True)
 if card["info"]:
     st.markdown(f"<div class='box'>{html.escape(card['info'])}</div>", unsafe_allow_html=True)
 else:
-    st.write("아직 입력된 정보가 없습니다.")
+    st.markdown("<div class='empty'>아직 입력된 정보가 없습니다. 시트 종목 탭 D열에 적으면 나옵니다.</div>", unsafe_allow_html=True)
 
 if card["memo"]:
-    st.markdown("**메모**")
+    st.markdown("<div class='sec'>메모</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='box'>{html.escape(card['memo'])}</div>", unsafe_allow_html=True)
 
-st.markdown("**관련 이슈** (최신순)")
+st.markdown("<div class='sec'>관련 이슈 · 최신순</div>", unsafe_allow_html=True)
 for e in db.stock_events(code):
-    tag = "<span class='tag'>텔레그램만</span>" if e["grp"] == "telegram" else ""
-    st.markdown(
-        f"<div class='it'><b>{e['date']}</b> {ui.pct_html(e['pct'])}"
-        f"<small>{ui.amount_text(e['amount_est'])}</small>{tag}</div>",
-        unsafe_allow_html=True,
+    ui.card(
+        e["date"], pct=e["pct"], meta=ui.amount_text(e["amount_est"]),
+        tag=e["grp"] == "telegram", themes=db.split_themes(e["theme"]),
+        text=e["telegram"], news=e["news"],
     )
-    themes = db.split_themes(e["theme"])
-    if themes:
-        st.markdown(f"<div class='th'>{ui.chips(themes)}</div>", unsafe_allow_html=True)
-    if e["telegram"]:
-        st.markdown(f"<div class='sub'>{html.escape(e['telegram'])}</div>", unsafe_allow_html=True)
-    if e["news"]:
-        st.markdown(ui.news_html(e["news"]), unsafe_allow_html=True)

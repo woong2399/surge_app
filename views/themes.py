@@ -9,11 +9,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import db  # noqa: E402
 import ui  # noqa: E402
 
-ui.setup("테마")
 ui.need_token()
 
 themes = db.all_themes()
 if not themes:
+    ui.setup("테마")
     st.info("아직 입력된 테마가 없습니다. 시트 이력 탭의 테마 열을 채우면 여기에 나옵니다.")
     st.stop()
 
@@ -25,7 +25,7 @@ with st.sidebar:
     theme = st.radio("테마 목록", shown, label_visibility="collapsed") if shown else None
 
 if not theme:
-    st.write("옆 목록에서 테마를 고르세요. 폰에서는 왼쪽 위 `>>` 를 누르면 목록이 열립니다.")
+    ui.setup("테마", "옆 목록에서 테마를 고르세요. 폰에서는 왼쪽 위 » 를 누르면 목록이 열립니다.")
     st.stop()
 
 events = db.theme_events(theme)
@@ -34,26 +34,17 @@ for e in events:
     if e["name"] not in stocks:
         stocks.append(e["name"])
 
-st.subheader(theme)
-st.markdown("**종목**")
-st.markdown("".join(f"<span class='chip'>{html.escape(s)}</span>" for s in stocks), unsafe_allow_html=True)
+ui.setup(theme, f"종목 {len(stocks)}개")
+st.markdown("<div class='sec'>이 테마의 종목</div>", unsafe_allow_html=True)
+st.markdown(ui.chips(stocks).replace("class='chips'", "class='chips' style='margin-top:0'"), unsafe_allow_html=True)
 
-st.markdown("**날짜별 이슈** (최신순)")
 last = None
 for e in events:
     if e["date"] != last:
-        st.markdown(f"<h2>{e['date']}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<div class='dh'>{e['date']}</div>", unsafe_allow_html=True)
         last = e["date"]
-    tag = "<span class='tag'>텔레그램만</span>" if e["grp"] == "telegram" else ""
-    st.markdown(
-        f"<div class='it'><b>{html.escape(e['name'])}</b><small>{e['code']}</small> "
-        f"{ui.pct_html(e['pct'])}{tag}</div>",
-        unsafe_allow_html=True,
+    ui.card(
+        e["name"], code=e["code"], pct=e["pct"], tag=e["grp"] == "telegram",
+        themes=[t for t in db.split_themes(e["theme"]) if t != theme],
+        text=e["telegram"], news=e["news"],
     )
-    others = [t for t in db.split_themes(e["theme"]) if t != theme]
-    if others:
-        st.markdown(f"<div class='th'>{ui.chips(others)}</div>", unsafe_allow_html=True)
-    if e["telegram"]:
-        st.markdown(f"<div class='sub'>{html.escape(e['telegram'])}</div>", unsafe_allow_html=True)
-    if e["news"]:
-        st.markdown(ui.news_html(e["news"]), unsafe_allow_html=True)
