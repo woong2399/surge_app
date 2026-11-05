@@ -6,7 +6,7 @@ import streamlit as st
 
 CSS = """<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
-html, body, [class*="st-"], .stMarkdown, button, input, textarea {
+.stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="material"]) {
   font-family: 'Pretendard', -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif !important;
 }
 :root{
