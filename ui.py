@@ -28,6 +28,10 @@ header[data-testid="stHeader"]{background:transparent}
 .c-meta{margin-top:3px;font-size:12.5px;color:var(--mute)}
 .chips{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
 .chip{font-size:14.5px;font-weight:650;color:var(--chip-fg);background:var(--chip-bg);border-radius:999px;padding:4px 12px;line-height:1.35}
+.trow{display:flex;gap:10px;align-items:flex-start;margin:6px 0}
+.trow .d{flex:none;width:5.2em;font-size:13px;color:var(--mute);padding-top:6px;font-variant-numeric:tabular-nums}
+.trow .chips{margin-top:0}
+.chip.new{outline:2px solid var(--chip-fg);outline-offset:-2px}
 .tag{display:inline-block;font-size:11px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--mute);margin-left:6px;vertical-align:2px}
 .c-txt{margin-top:10px;font-size:15px;line-height:1.65}
 .c-news{margin-top:8px;display:flex;flex-direction:column;gap:4px}
@@ -104,3 +108,19 @@ def need_token():
         st.error("시트를 읽지 못했습니다. 시트가 '링크가 있는 누구나 보기'인지, 탭 이름이 이력·종목인지 확인하세요.")
         st.caption(str(e)[:200])
         st.stop()
+
+
+def theme_timeline(events):
+    """날짜별 테마 변화. events 는 날짜 오름차순 [{date, theme}]. 전날까지 없던 테마는 윤곽선으로 표시한다."""
+    import db
+    seen, rows = set(), []
+    for e in events:
+        ts = db.split_themes(e["theme"])
+        if not ts:
+            continue
+        chips_html = "".join(
+            f"<span class='chip{'' if t in seen else ' new'}'>{html.escape(t)}</span>" for t in ts
+        )
+        seen.update(ts)
+        rows.append(f"<div class='trow'><div class='d'>{e['date'][5:]}</div><div class='chips'>{chips_html}</div></div>")
+    return "".join(rows)

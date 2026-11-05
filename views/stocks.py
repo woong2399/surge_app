@@ -37,6 +37,12 @@ if card["themes"]:
 else:
     st.markdown("<div class='empty'>아직 입력된 테마가 없습니다.</div>", unsafe_allow_html=True)
 
+events = db.stock_events(code)
+tl = ui.theme_timeline(sorted(events, key=lambda e: e["date"]))
+if tl and len([e for e in events if e["theme"]]) > 1:
+    st.markdown("<div class='sec'>테마 변화 · 윤곽선은 새로 나온 테마</div>", unsafe_allow_html=True)
+    st.markdown(tl, unsafe_allow_html=True)
+
 st.markdown("<div class='sec'>종목 정보</div>", unsafe_allow_html=True)
 if card["info"]:
     st.markdown(f"<div class='box'>{html.escape(card['info'])}</div>", unsafe_allow_html=True)
@@ -48,7 +54,7 @@ if card["memo"]:
     st.markdown(f"<div class='box'>{html.escape(card['memo'])}</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='sec'>관련 이슈 · 최신순</div>", unsafe_allow_html=True)
-for e in db.stock_events(code):
+for e in events:
     ui.card(
         e["date"], pct=e["pct"], meta=ui.amount_text(e["amount_est"]),
         tag=e["grp"] == "telegram", themes=db.split_themes(e["theme"]),
