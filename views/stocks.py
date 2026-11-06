@@ -17,6 +17,15 @@ if not stocks:
     st.info("아직 올라온 종목이 없습니다.")
     st.stop()
 
+# 이슈·테마 화면의 카드를 누르면(?code=코드) 그 종목이 골라진 채로 열린다.
+want = st.query_params.get("code")
+if want:
+    hit = next((s for s in stocks if s["code"] == want), None)
+    if hit:
+        st.session_state["stock_q"] = ""
+        st.session_state["stock_pick"] = f"{hit['name']}  {hit['code']}"
+    del st.query_params["code"]
+
 c1, c2 = st.columns([1, 1.4])
 q = c2.text_input("검색", placeholder="🔍 종목명·코드 검색", label_visibility="collapsed", key="stock_q").strip().lower()
 shown = [s for s in stocks if q in f"{s['name']} {s['code']}".lower()]

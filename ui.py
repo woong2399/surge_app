@@ -20,8 +20,12 @@ header[data-testid="stHeader"]{background:transparent}
 .hd{margin:0 0 .6rem}
 .hd .t{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin:0}
 .hd .s{color:var(--mute);font-size:14px;margin-top:2px}
-.c{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px;background:var(--soft)}
+.c{position:relative;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px;background:var(--soft)}
 .c-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.c-name a.sl{color:inherit;text-decoration:none}
+.c-name a.sl::after{content:'';position:absolute;inset:0;border-radius:14px}
+.c.go{cursor:pointer}.c.go:hover{border-color:var(--chip-fg)}
+.c-news a,.chips{position:relative;z-index:2}
 .c-name{font-size:18px;font-weight:700;letter-spacing:-.01em;min-width:0}
 .c-code{font-size:12px;color:var(--mute);font-weight:500;margin-left:6px}
 .pct{flex:none;font-size:16px;font-weight:800;color:var(--up);background:var(--up-bg);border-radius:999px;padding:3px 11px;font-variant-numeric:tabular-nums}
@@ -85,15 +89,18 @@ def news_html(text):
     return "<div class='c-news'>" + "".join(out) + "</div>" if out else ""
 
 
-def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", news=""):
+def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", news="", href=None):
     """종목·이슈 한 칸."""
     code_html = f"<span class='c-code'>{html.escape(code)}</span>" if code else ""
+    title_html = html.escape(title)
+    if href:  # 카드를 누르면 href 로 이동
+        title_html = f"<a class='sl' href='{html.escape(href)}' target='_self'>{title_html}</a>"
     tag_html = "<span class='tag'>텔레그램만</span>" if tag else ""
     pct_part = pct_html(pct) if pct is not None else ""
     meta_html = f"<div class='c-meta'>{html.escape(meta)}</div>" if meta else ""
     text_html = f"<div class='c-txt'>{html.escape(text)}</div>" if text else ""
     st.markdown(
-        f"<div class='c'><div class='c-top'><div class='c-name'>{html.escape(title)}{code_html}{tag_html}</div>{pct_part}</div>"
+        f"<div class='c{' go' if href else ''}'><div class='c-top'><div class='c-name'>{title_html}{code_html}{tag_html}</div>{pct_part}</div>"
         f"{meta_html}{chips(themes)}{text_html}{news_html(news)}</div>",
         unsafe_allow_html=True,
     )

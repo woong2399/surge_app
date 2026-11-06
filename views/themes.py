@@ -26,22 +26,21 @@ if not theme:
     st.stop()
 
 events = db.theme_events(theme)
-stocks = []
+by = {}  # 종목 코드 → 그 테마로 나온 날짜들 (종목마다 카드는 한 장)
 for e in events:
-    if e["name"] not in stocks:
-        stocks.append(e["name"])
+    by.setdefault(e["code"], []).append(e)
+cards = []
+for code, evs in by.items():
+    last = max(evs, key=lambda e: e["date"])
+    cards.append((last["date"], last["pct"] or 0, code, last, len(evs)))
+cards.sort(key=lambda c: (c[0], c[1]), reverse=True)
 
-ui.setup(theme, f"종목 {len(stocks)}개")
+ui.setup(theme, f"종목 {len(cards)}개 · 최근에 나온 순")
 st.markdown("<div class='sec'>이 테마의 종목</div>", unsafe_allow_html=True)
-st.markdown(ui.chips(stocks).replace("class='chips'", "class='chips' style='margin-top:0'"), unsafe_allow_html=True)
-
-last = None
-for e in events:
-    if e["date"] != last:
-        st.markdown(f"<div class='dh'>{e['date']}</div>", unsafe_allow_html=True)
-        last = e["date"]
+for date_, pct_, code, last, n in cards:
+    card = db.stock_card(code)
     ui.card(
-        e["name"], code=e["code"], pct=e["pct"], tag=e["grp"] == "telegram",
-        themes=[t for t in db.split_themes(e["theme"]) if t != theme],
-        text=e["telegram"], news=e["news"],
+        last["name"], code=code, pct=last["pct"], meta=f"최근 {date_[5:]} · 이 테마로 {n}번 나옴",
+        tag=last["grp"] == "telegram", themes=[t for t in card["themes"] if t != theme],
+        text=card["info"], href=f"stocks?code={code}",
     )

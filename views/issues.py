@@ -35,5 +35,5 @@ for r in rows:
     ui.card(
         r["name"], code=r["code"], pct=r["pct"], meta=ui.amount_text(r["amount_est"]),
         tag=r["grp"] == "telegram", themes=db.split_themes(r["theme"]),
-        text=r["telegram"], news=r["news"],
+        text=r["telegram"], news=r["news"], href=f"stocks?code={r['code']}",
     )
