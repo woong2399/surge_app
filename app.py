@@ -1,5 +1,14 @@
 """Surge 종목 창고 — 이슈 / 거래대금 / 종목 / 테마 네 장. 화면 코드는 views/ 에 있다."""
+import importlib
+
 import streamlit as st
+
+import db
+import ui
+
+# GitHub 에 새 코드를 올려도 서버가 예전 db·ui 모듈을 메모리에 들고 있으면 오류가 난다 → 매번 새로 읽는다.
+importlib.reload(db)
+importlib.reload(ui)
 
 st.set_page_config(page_title="Surge 종목 창고", layout="centered")
 
