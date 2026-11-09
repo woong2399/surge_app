@@ -50,13 +50,26 @@ def _num(s):
         return None
 
 
+def _cells(df, n):
+    """표의 각 줄을 n 칸 글자 목록으로 (칸이 모자라면 빈 글자로 채움)."""
+    for r in df.itertuples(index=False):
+        vals = [str(x).strip() for x in r][:n]
+        yield vals + [""] * (n - len(vals))
+
+
+def _flow(rank, new_high, foreign, inst, program, top30):
+    """이력 I~N 칸, 거래대금상위 탭이 같이 쓰는 수급 칸."""
+    return {"rank": _num(rank), "new_high": new_high, "foreign": _num(foreign), "inst": _num(inst),
+            "program": _num(program), "top30": _num(top30)}
+
+
 @st.cache_data(ttl=TTL, show_spinner="시트를 읽는 중…")
 def history():
-    """이력 탭 전체 → [{date, code, name, pct, amount_est, grp, theme, telegram, news}]"""
+    """이력 탭 전체 → [{date, code, name, pct, amount_est, grp, theme, telegram, news, rank, new_high, …}]"""
     df = _csv("이력")
     rows = []
-    for r in df.iloc[:, :8].itertuples(index=False):
-        date, code, name, pct, amount, theme, telegram, news = [str(x).strip() for x in r]
+    for vals in _cells(df, 14):
+        date, code, name, pct, amount, theme, telegram, news = vals[:8]
         if not code or not date:
             continue
         p, a = _num(pct), _num(amount)
@@ -65,8 +78,40 @@ def history():
         telegram_only = a is None or p < 10  # 10%↑ 목록(Surge)에 없던 종목
         rows.append({"date": date, "code": code, "name": name, "pct": p, "amount_est": a,
                      "grp": "telegram" if telegram_only else "surge",
-                     "theme": theme, "telegram": telegram.removeprefix("* "), "news": news})
+                     "theme": theme, "telegram": telegram.removeprefix("* "), "news": news,
+                     **_flow(*vals[8:14])})
     return rows
+
+
+@st.cache_data(ttl=TTL, show_spinner=False)
+def volume():
+    """거래대금상위 탭 → [{date, rank, code, name, pct, amount(억), new_high, foreign, inst, program, top30,
+    in_diary, theme, leader, reason}]. 탭이 없거나 비어 있으면 []."""
+    try:
+        df = _csv("거래대금상위")
+    except Exception:
+        return []
+    rows = []
+    for vals in _cells(df, 15):
+        date, rank, code, name, pct, amount, new_high, foreign, inst, program, top30, in_diary, theme, leader, reason = vals
+        if not date or not code or date == "date":
+            continue
+        rows.append({"date": date, "code": code, "name": name, "pct": _num(pct), "amount": _num(amount),
+                     **_flow(rank, new_high, foreign, inst, program, top30),
+                     "in_diary": bool(in_diary), "theme": theme, "leader": bool(leader), "reason": reason})
+    return rows
+
+
+def volume_dates():
+    return sorted({r["date"] for r in volume()}, reverse=True)
+
+
+def volume_day(day):
+    return sorted((r for r in volume() if r["date"] == day), key=lambda r: r["rank"] or 999)
+
+
+def stock_volume_events(code):
+    return sorted((r for r in volume() if r["code"] == code), key=lambda r: r["date"], reverse=True)
 
 
 @st.cache_data(ttl=TTL, show_spinner=False)
@@ -90,16 +135,18 @@ def day_rows(day):
 
 
 def stocks():
+    """일지(이력) 종목 + 거래대금상위 종목."""
     names = {}
-    for r in history():
-        names[r["code"]] = r["name"]
+    for r in volume() + history():
+        if r["name"]:
+            names[r["code"]] = r["name"]
     return sorted(({"code": c, "name": n} for c, n in names.items()), key=lambda s: s["name"])
 
 
 def stock_card(code):
     note = stock_notes().get(code, {"info": "", "memo": ""})
     themes = []
-    for r in sorted((r for r in history() if r["code"] == code), key=lambda r: r["date"]):
+    for r in sorted((r for r in history() + volume() if r["code"] == code), key=lambda r: r["date"]):
         for t in split_themes(r["theme"]):
             if t not in themes:
                 themes.append(t)

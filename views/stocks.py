@@ -62,10 +62,24 @@ if card["memo"]:
     st.markdown("<div class='sec'>메모</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='box'>{html.escape(card['memo'])}</div>", unsafe_allow_html=True)
 
-st.markdown("<div class='sec'>관련 이슈 · 최신순</div>", unsafe_allow_html=True)
+st.markdown("<div class='sec'>관련 이슈(일지) · 최신순</div>", unsafe_allow_html=True)
+if not events:
+    st.markdown("<div class='empty'>일지에 나온 적이 없습니다.</div>", unsafe_allow_html=True)
 for e in events:
     ui.card(
         e["date"], pct=e["pct"], meta=ui.amount_text(e["amount_est"]),
         tag=e["grp"] == "telegram", themes=db.split_themes(e["theme"]),
-        text=e["telegram"], news=e["news"],
+        text=e["telegram"], news=e["news"], meta2=ui.flow_line(e),
+    )
+
+vols = db.stock_volume_events(code)
+st.markdown(f"<div class='sec'>거래대금 상위 기록 · {len(vols)}번 · 최신순</div>", unsafe_allow_html=True)
+if not vols:
+    st.markdown("<div class='empty'>거래대금 상위 30에 든 적이 없습니다.</div>", unsafe_allow_html=True)
+for v in vols:
+    flow = ui.flow_line(v)
+    ui.card(
+        ("👑 " if v["leader"] else "") + v["date"], pct=v["pct"],
+        meta=f"{v['rank']:.0f}위 · 거래대금 {ui.eok_text(v['amount'])}" if v["rank"] is not None else f"거래대금 {ui.eok_text(v['amount'])}",
+        meta2=flow.split(" · ", 1)[1] if flow else "", themes=db.split_themes(v["theme"]), text=v["reason"],
     )

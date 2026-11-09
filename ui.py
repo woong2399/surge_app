@@ -29,7 +29,11 @@ header[data-testid="stHeader"]{background:transparent}
 .c-name{font-size:18px;font-weight:700;letter-spacing:-.01em;min-width:0}
 .c-code{font-size:12px;color:var(--mute);font-weight:500;margin-left:6px}
 .pct{flex:none;font-size:16px;font-weight:800;color:var(--up);background:var(--up-bg);border-radius:999px;padding:3px 11px;font-variant-numeric:tabular-nums}
-.c-meta{margin-top:3px;font-size:12.5px;color:var(--mute)}
+.c-meta{margin-top:3px;font-size:12.5px;color:var(--mute);white-space:pre-line}
+.pct.dn{color:#2f6fe0;background:rgba(47,111,224,.13)}
+.grp{margin:24px 0 8px;padding:10px 14px;border-radius:12px;background:var(--chip-bg)}
+.grp .gt{font-size:17px;font-weight:800;color:var(--chip-fg)}
+.grp .gs{font-size:13px;color:var(--mute);margin-top:2px}
 .chips{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
 .chip{font-size:14.5px;font-weight:650;color:var(--chip-fg);background:var(--chip-bg);border-radius:999px;padding:4px 12px;line-height:1.35}
 .trow{display:flex;gap:10px;align-items:flex-start;margin:6px 0}
@@ -57,11 +61,41 @@ def setup(title, sub=None):
 
 
 def pct_html(pct):
-    return f"<span class='pct'>+{pct:.2f}%</span>"
+    return f"<span class='pct{' dn' if pct < 0 else ''}'>{pct:+.2f}%</span>"
 
 
 def amount_text(a):
     return "" if a is None else f"거래대금 {a:,.0f}백만 원"
+
+
+def eok_text(a):
+    """억 원 → '9,836억', '1조 2,340억'. 빈 값이면 '-'."""
+    if a is None:
+        return "-"
+    jo, eok = divmod(round(a), 10000)
+    return f"{jo}조 {eok:,}억" if jo else f"{eok:,}억"
+
+
+def _signed(label, v):
+    """억 원. 10억 미만은 소수 첫째 자리까지(+0.3), 0 은 0."""
+    if v is None:
+        return f"{label} -"
+    if round(v, 1) == 0:
+        return f"{label} 0"
+    return f"{label} {v:+,.1f}" if abs(v) < 10 else f"{label} {v:+,.0f}"
+
+
+def flow_line(r):
+    """'거래대금 12위 · 52주 신고가 · 외 +305 · 기 +810 · 프 -20 · 상위30 5회' (억 원). 값이 모두 비면 ''."""
+    keys = ("rank", "new_high", "foreign", "inst", "program", "top30")
+    if all(r.get(k) in (None, "") for k in keys):
+        return ""
+    parts = [f"거래대금 {r['rank']:.0f}위" if r.get("rank") is not None else "거래대금 -위"]
+    if r.get("new_high"):
+        parts.append(f"{r['new_high']} 신고가")
+    parts += [_signed("외", r.get("foreign")), _signed("기", r.get("inst")), _signed("프", r.get("program"))]
+    parts.append(f"상위30 {r['top30']:.0f}회" if r.get("top30") is not None else "상위30 -회")
+    return " · ".join(parts)
 
 
 def chips(themes):
@@ -89,8 +123,10 @@ def news_html(text):
     return "<div class='c-news'>" + "".join(out) + "</div>" if out else ""
 
 
-def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", news="", href=None):
-    """종목·이슈 한 칸."""
+def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", news="", href=None, meta2=""):
+    """종목·이슈 한 칸. meta2 는 meta 아래 한 줄 더(수급 등)."""
+    if meta2:
+        meta = f"{meta}\n{meta2}" if meta else meta2
     code_html = f"<span class='c-code'>{html.escape(code)}</span>" if code else ""
     title_html = html.escape(title)
     if href:  # 카드를 누르면 href 로 이동
