@@ -121,8 +121,16 @@ def save_memo(code, memo):
 
 def read_values(tab):
     """서비스 계정으로 amount 시트 탭 읽기(링크 공개가 꺼져 있어도 됨). 쓸 수 없으면 None."""
+    global last_error
     try:
         cl = _client()
-        return cl.open_by_key(db.AMOUNT_SHEET_ID).worksheet(tab).get_all_values() if cl else None
-    except Exception:
+        if cl is None:
+            last_error = "서비스 계정 키가 Secrets 에 없습니다 (gcp_service_account)."
+            return None
+        return cl.open_by_key(db.AMOUNT_SHEET_ID).worksheet(tab).get_all_values()
+    except Exception as e:
+        last_error = f"{type(e).__name__}: {str(e)[:200]}"
         return None
+
+
+last_error = ""  # 화면에 원인을 보여 주기 위한 마지막 읽기 오류 (키 내용은 담지 않는다)

@@ -19,6 +19,9 @@ dates = db.volume_dates()
 if not dates:
     ui.setup("거래대금 상위")
     st.info("아직 올라온 날짜가 없습니다. 시트 거래대금상위 탭이 채워지면 여기에 나옵니다.")
+    import edit
+    if edit.last_error:
+        st.caption(f"amount 시트 읽기 오류: {edit.last_error}")
     st.stop()
 
 c1, c2 = st.columns([1, 1.4])
