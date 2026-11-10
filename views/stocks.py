@@ -77,6 +77,18 @@ if card["amount_info"] or card["amount_memo"]:
     body = "\n\n".join(x for x in [card["amount_info"], card["amount_memo"]] if x)
     st.markdown(f"<div class='box'>{html.escape(body)}</div>", unsafe_allow_html=True)
 
+if code in db.amount_notes() and st.toggle("✏️ 종목 이슈 입력", key=f"memo_edit_{code}"):
+    import edit
+    if edit.unlocked():
+        with st.form(f"memo_form_{code}"):
+            memo = st.text_area("종목 이슈", value=card["amount_memo"], height=180,
+                                placeholder="이 종목의 이슈를 적어 두세요 (amount 시트 종목 탭 memo 칸)")
+            if st.form_submit_button("저장", type="primary", use_container_width=True):
+                try:
+                    st.success("저장했습니다." if edit.save_memo(code, memo) else "amount 종목 탭에 이 종목 줄이 없습니다.")
+                except Exception as e:
+                    st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
+
 vols = db.stock_volume_events(code)
 st.markdown(f"<div class='sec'>거래대금 상위 기록 · {len(vols)}번 · 최신순</div>", unsafe_allow_html=True)
 if not vols:

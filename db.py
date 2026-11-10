@@ -31,6 +31,12 @@ AMOUNT_SHEET_ID = "16G7kVUSJokomw7tq42VVBjelgFoW1mQmA34_Nh2HnC0"  # 거래대금
 
 
 def _csv(tab, sid=None):
+    if sid == AMOUNT_SHEET_ID:  # 서비스 계정 키가 있으면 그걸로 읽는다(링크 공개가 꺼져 있어도 됨)
+        import edit
+        vals = edit.read_values(tab)
+        if vals:
+            n = len(vals[0])
+            return pd.DataFrame([r + [""] * (n - len(r)) for r in vals[1:]], columns=vals[0], dtype=str)
     url = (f"https://docs.google.com/spreadsheets/d/{sid or sheet_id()}/gviz/tq?tqx=out:csv&headers=1&sheet="
            + urllib.parse.quote(tab))
     return pd.read_csv(url, dtype=str, keep_default_na=False)
