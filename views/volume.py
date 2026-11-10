@@ -20,8 +20,11 @@ if not dates:
     ui.setup("거래대금 상위")
     st.info("아직 올라온 날짜가 없습니다. 시트 거래대금상위 탭이 채워지면 여기에 나옵니다.")
     import edit
-    if edit.last_error:
+    if edit.read_values("거래대금상위") is None:  # 왜 비었는지 다시 읽어 보고 원인을 보여 준다
         st.caption(f"amount 시트 읽기 오류: {edit.last_error}")
+    else:
+        st.caption("서비스 계정으로는 읽힙니다. 잠시 뒤(1분) 새로 고침해 보세요.")
+        st.cache_data.clear()
     st.stop()
 
 c1, c2 = st.columns([1, 1.4])
