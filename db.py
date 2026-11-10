@@ -27,8 +27,11 @@ def sheet_id():
     return DEFAULT_SHEET_ID
 
 
-def _csv(tab):
-    url = (f"https://docs.google.com/spreadsheets/d/{sheet_id()}/gviz/tq?tqx=out:csv&sheet="
+AMOUNT_SHEET_ID = "16G7kVUSJokomw7tq42VVBjelgFoW1mQmA34_Nh2HnC0"  # 거래대금상위 탭이 있는 amount 시트
+
+
+def _csv(tab, sid=None):
+    url = (f"https://docs.google.com/spreadsheets/d/{sid or sheet_id()}/gviz/tq?tqx=out:csv&sheet="
            + urllib.parse.quote(tab))
     return pd.read_csv(url, dtype=str, keep_default_na=False)
 
@@ -85,18 +88,20 @@ def history():
 
 @st.cache_data(ttl=TTL, show_spinner=False)
 def volume():
-    """거래대금상위 탭 → [{date, rank, code, name, pct, amount(억), new_high, foreign, inst, program, top30,
-    in_diary, theme, leader, reason}]. 탭이 없거나 비어 있으면 []."""
+    """amount 시트 거래대금상위 탭 → [{date, rank, code, name, pct, amount(억), mktcap(억), turnover(%), new_high,
+    foreign, inst, program, top30, in_diary, theme, leader, reason}]. 탭이 없거나 비어 있으면 []."""
     try:
-        df = _csv("거래대금상위")
+        df = _csv("거래대금상위", AMOUNT_SHEET_ID)
     except Exception:
         return []
     rows = []
-    for vals in _cells(df, 15):
-        date, rank, code, name, pct, amount, new_high, foreign, inst, program, top30, in_diary, theme, leader, reason = vals
+    for vals in _cells(df, 17):
+        (date, rank, code, name, pct, amount, mktcap, turnover, new_high, foreign, inst, program, top30,
+         in_diary, theme, leader, reason) = vals
         if not date or not code or date == "date":
             continue
         rows.append({"date": date, "code": code, "name": name, "pct": _num(pct), "amount": _num(amount),
+                     "mktcap": _num(mktcap), "turnover": _num(turnover),
                      **_flow(rank, new_high, foreign, inst, program, top30),
                      "in_diary": bool(in_diary), "theme": theme, "leader": bool(leader), "reason": reason})
     return rows

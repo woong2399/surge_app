@@ -57,6 +57,8 @@ for t in order:
     )
     for r in rs:
         meta = [f"{r['rank']:.0f}위" if r["rank"] is not None else "-위", f"거래대금 {ui.eok_text(r['amount'])}"]
+        if ui.cap_text(r):
+            meta.append(ui.cap_text(r))
         if r["in_diary"]:
             meta.append("일지 ✓")
         flow = ui.flow_line(r)

@@ -80,6 +80,7 @@ for v in vols:
     flow = ui.flow_line(v)
     ui.card(
         ("👑 " if v["leader"] else "") + v["date"], pct=v["pct"],
-        meta=f"{v['rank']:.0f}위 · 거래대금 {ui.eok_text(v['amount'])}" if v["rank"] is not None else f"거래대금 {ui.eok_text(v['amount'])}",
+        meta=" · ".join(x for x in [f"{v['rank']:.0f}위" if v["rank"] is not None else "",
+                                     f"거래대금 {ui.eok_text(v['amount'])}", ui.cap_text(v)] if x),
         meta2=flow.split(" · ", 1)[1] if flow else "", themes=db.split_themes(v["theme"]), text=v["reason"],
     )

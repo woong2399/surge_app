@@ -76,6 +76,14 @@ def eok_text(a):
     return f"{jo}조 {eok:,}억" if jo else f"{eok:,}억"
 
 
+def cap_text(r):
+    """'시총 2조 4,986억 · 회전율 10.6%'. 시총이 없으면 ''."""
+    if r.get("mktcap") is None:
+        return ""
+    t = r.get("turnover")
+    return f"시총 {eok_text(r['mktcap'])}" + (f" · 회전율 {t:.2f}%" if t is not None and t < 1 else f" · 회전율 {t:.1f}%" if t is not None else "")
+
+
 def _signed(label, v):
     """억 원. 10억 미만은 소수 첫째 자리까지(+0.3), 0 은 0."""
     if v is None:
