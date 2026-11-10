@@ -72,6 +72,11 @@ for e in events:
         text=e["telegram"], news=e["news"], meta2=ui.flow_line(e),
     )
 
+if card["amount_info"] or card["amount_memo"]:
+    st.markdown("<div class='sec'>거래대금 메모 (amount 시트)</div>", unsafe_allow_html=True)
+    body = "\n\n".join(x for x in [card["amount_info"], card["amount_memo"]] if x)
+    st.markdown(f"<div class='box'>{html.escape(body)}</div>", unsafe_allow_html=True)
+
 vols = db.stock_volume_events(code)
 st.markdown(f"<div class='sec'>거래대금 상위 기록 · {len(vols)}번 · 최신순</div>", unsafe_allow_html=True)
 if not vols:

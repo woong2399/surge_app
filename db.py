@@ -31,7 +31,7 @@ AMOUNT_SHEET_ID = "16G7kVUSJokomw7tq42VVBjelgFoW1mQmA34_Nh2HnC0"  # 거래대금
 
 
 def _csv(tab, sid=None):
-    url = (f"https://docs.google.com/spreadsheets/d/{sid or sheet_id()}/gviz/tq?tqx=out:csv&sheet="
+    url = (f"https://docs.google.com/spreadsheets/d/{sid or sheet_id()}/gviz/tq?tqx=out:csv&headers=1&sheet="
            + urllib.parse.quote(tab))
     return pd.read_csv(url, dtype=str, keep_default_na=False)
 
@@ -86,6 +86,13 @@ def history():
     return rows
 
 
+def _named(df):
+    """첫 줄 제목 이름으로 읽기: 줄마다 {제목: 글자}. 사용자가 칸 순서를 바꿔도 된다."""
+    cols = [str(c).strip() for c in df.columns]
+    for r in df.itertuples(index=False):
+        yield {c: str(x).strip() for c, x in zip(cols, r)}
+
+
 @st.cache_data(ttl=TTL, show_spinner=False)
 def volume():
     """amount 시트 거래대금상위 탭 → [{date, rank, code, name, pct, amount(억), mktcap(억), turnover(%), new_high,
@@ -95,15 +102,15 @@ def volume():
     except Exception:
         return []
     rows = []
-    for vals in _cells(df, 17):
-        (date, rank, code, name, pct, amount, mktcap, turnover, new_high, foreign, inst, program, top30,
-         in_diary, theme, leader, reason) = vals
-        if not date or not code or date == "date":
+    for v in _named(df):
+        g = lambda k: v.get(k, "")
+        if not g("date") or not g("code") or g("date") == "date":
             continue
-        rows.append({"date": date, "code": code, "name": name, "pct": _num(pct), "amount": _num(amount),
-                     "mktcap": _num(mktcap), "turnover": _num(turnover),
-                     **_flow(rank, new_high, foreign, inst, program, top30),
-                     "in_diary": bool(in_diary), "theme": theme, "leader": bool(leader), "reason": reason})
+        rows.append({"date": g("date"), "code": g("code"), "name": g("name"), "pct": _num(g("pct")),
+                     "amount": _num(g("amount")), "mktcap": _num(g("mktcap")), "turnover": _num(g("turnover")),
+                     **_flow(g("rank"), g("new_high"), g("foreign"), g("inst"), g("program"), g("top30_cnt")),
+                     "in_diary": bool(g("in_diary")), "theme": g("theme"), "leader": bool(g("leader")),
+                     "reason": g("reason")})
     return rows
 
 
@@ -131,6 +138,17 @@ def stock_notes():
     return out
 
 
+@st.cache_data(ttl=TTL, show_spinner=False)
+def amount_notes():
+    """amount 시트 종목 탭 → {code: {info, memo}} (surge 시트 종목 탭과 따로 관리)."""
+    try:
+        df = _csv("종목", AMOUNT_SHEET_ID)
+    except Exception:
+        return {}
+    return {v["code"]: {"info": v.get("info", ""), "memo": v.get("memo", "")}
+            for v in _named(df) if v.get("code")}
+
+
 def dates():
     return sorted({r["date"] for r in history()}, reverse=True)
 
@@ -155,7 +173,9 @@ def stock_card(code):
         for t in split_themes(r["theme"]):
             if t not in themes:
                 themes.append(t)
-    return {"info": note["info"], "memo": note["memo"], "themes": themes}
+    an = amount_notes().get(code, {"info": "", "memo": ""})
+    return {"info": note["info"], "memo": note["memo"], "themes": themes,
+            "amount_info": an["info"], "amount_memo": an["memo"]}
 
 
 def stock_events(code):
