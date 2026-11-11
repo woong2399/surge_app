@@ -35,6 +35,8 @@ day = c1.selectbox("날짜", dates, label_visibility="collapsed", key="vol_day")
 q = c2.text_input("검색", placeholder="🔍 종목·테마·이유 검색", label_visibility="collapsed", key="vol_q").strip().lower()
 
 rows = db.volume_day(day)
+_i = dates.index(day)  # dates 는 최신순 → 바로 다음 칸이 직전 거래일. 그날 상위 30에 없던 종목이 '신규'(가장 오래된 날은 비교할 날이 없어 표시 안 함)
+prev = {r["code"] for r in db.volume_day(dates[_i + 1])} if _i + 1 < len(dates) else None
 if q:
     rows = [r for r in rows if q in f"{r['name']} {r['code']} {r['theme']} {r['reason']}".lower()]
 
@@ -53,7 +55,7 @@ order = sorted(groups, key=lambda t: (t == NO_THEME, -(total(groups[t]) or 0)))
 
 d = datetime.strptime(day, "%Y-%m-%d")
 ui.setup(f"{d.month}월 {d.day}일 {WD[d.weekday()]}요일",
-         f"상위 {len(rows)}종목 · 합계 {ui.eok_text(total(rows))}")
+         f"상위 {len(rows)}종목 · 합계 {ui.eok_text(total(rows))}" + (f" · 신규 {sum(r['code'] not in prev for r in rows)}" if prev is not None else ""))
 view = st.radio("보기", ["등락률순", "테마별"], horizontal=True, label_visibility="collapsed", key="vol_view")
 
 if not rows:
@@ -71,6 +73,7 @@ def show(r, skip=None):
         meta2=flow.split(" · ", 1)[1] if flow else "",  # 순위는 위 줄에 있으니 뺀다
         themes=[x for x in db.split_themes(r["theme"]) if x != skip],
         text=r["reason"], href=f"stocks?code={r['code']}&from=volume&day={day}",
+        fresh=prev is not None and r["code"] not in prev,
     )
 
 

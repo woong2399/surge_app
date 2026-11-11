@@ -34,7 +34,7 @@ header[data-testid="stHeader"]{background:transparent}
 .c-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .c-name a.sl{color:inherit;text-decoration:none}
 .c-name a.sl::after{content:'';position:absolute;inset:0;border-radius:10px}
-.c.go{cursor:pointer}.c.go:hover{border-color:var(--chip-fg)}
+.c.go{cursor:pointer}.c.go:hover{border-color:var(--chip-fg)}.c.newtop,.c.newtop:hover{border-color:#e5484d}
 .c-news a,.chips{position:relative;z-index:2}
 .c-name{font-size:14.5px;font-weight:700;letter-spacing:-.01em;min-width:0}
 .c-code{font-size:11px;color:var(--mute);font-weight:500;margin-left:5px}
@@ -145,7 +145,7 @@ def news_html(text):
     return "<div class='c-news'>" + "".join(out) + "</div>" if out else ""
 
 
-def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", news="", href=None, meta2=""):
+def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", news="", href=None, meta2="", fresh=False):
     """종목·이슈 한 칸. meta2 는 meta 아래 한 줄 더(수급 등)."""
     if meta2:
         meta = f"{meta}\n{meta2}" if meta else meta2
@@ -158,7 +158,7 @@ def card(title, code=None, pct=None, meta="", tag=False, themes=(), text="", new
     meta_html = f"<div class='c-meta'>{html.escape(meta)}</div>" if meta else ""
     text_html = f"<div class='c-txt'>{html.escape(text)}</div>" if text else ""
     st.markdown(
-        f"<div class='c{' go' if href else ''}'><div class='c-top'><div class='c-name'>{title_html}{code_html}{tag_html}</div>{pct_part}</div>"
+        f"<div class='c{' go' if href else ''}{' newtop' if fresh else ''}'><div class='c-top'><div class='c-name'>{title_html}{code_html}{tag_html}</div>{pct_part}</div>"
         f"{meta_html}{chips(themes)}{text_html}{news_html(news)}</div>",
         unsafe_allow_html=True,
     )
