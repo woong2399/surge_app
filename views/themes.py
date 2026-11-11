@@ -64,6 +64,6 @@ for date_, pct_, code, last, n in cards:
     card = db.stock_card(code)
     ui.card(
         last["name"], code=code, pct=last["pct"], meta=f"최근 {date_[5:]} · 이 테마로 {n}일 나옴",
-        tag=last.get("grp") == "telegram", themes=[t for t in card["themes"] if t != theme],
+        tag=last.get("grp") == "telegram", themes=card["themes"],
         text=card["info"], href=f"stocks?code={code}",
     )
