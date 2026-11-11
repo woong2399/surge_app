@@ -1,4 +1,4 @@
-"""Surge 종목 창고 — 이슈 / 거래대금 / 종목 / 테마 네 장. 화면 코드는 views/ 에 있다."""
+"""일지(Surge 종목 창고) — 이슈 / 거래대금 / 종목 / 테마 / 관심종목 다섯 장. 화면 코드는 views/ 에 있다."""
 import importlib
 
 import streamlit as st
@@ -19,5 +19,6 @@ pg = st.navigation([
     st.Page("views/volume.py", title="거래대금"),
     st.Page("views/stocks.py", title="종목"),
     st.Page("views/themes.py", title="테마"),
+    st.Page("views/interest.py", title="관심종목"),
 ])
 pg.run()

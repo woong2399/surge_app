@@ -163,12 +163,53 @@ def day_rows(day):
     return sorted((r for r in history() if r["date"] == day), key=lambda r: -r["pct"])
 
 
+@st.cache_data(ttl=TTL, show_spinner=False)
+def manual_stocks():
+    """amount 시트 관심종목 탭 → [{name, theme, comment}] (사용자가 종목명만으로 직접 넣은 종목, 최근 추가가 앞).
+    탭이 없거나 읽을 수 없으면 []."""
+    import edit
+    vals = edit.read_values("관심종목")
+    if not vals or not {"name", "theme", "comment"} <= set(vals[0]):  # 탭이 없을 때 엉뚱한 시트를 읽지 않게 제목도 확인
+        return []
+    h = {n: i for i, n in enumerate(vals[0])}
+    out = []
+    for r in vals[1:]:
+        g = lambda f: r[h[f]].strip() if h[f] < len(r) else ""
+        if g("name"):
+            out.append({"name": g("name"), "theme": g("theme"), "comment": g("comment")})
+    return out[::-1]
+
+
+def known_codes():
+    """일지·거래대금에 나온 종목 이름 → 코드."""
+    out = {}
+    for r in volume() + history():
+        if r["name"]:
+            out[r["name"]] = r["code"]
+    return out
+
+
+def manual_code(name):
+    """관심종목의 종목 코드. 일지·거래대금에 나온 적이 있으면 그 코드, 없으면 '@이름'."""
+    return known_codes().get(name) or "@" + name
+
+
+def name_of(code):
+    if code.startswith("@"):
+        return code[1:]
+    return next((r["name"] for r in history() + volume() if r["code"] == code and r["name"]), "")
+
+
 def stocks():
-    """일지(이력) 종목 + 거래대금상위 종목."""
+    """일지(이력) 종목 + 거래대금상위 종목 + (그 둘에 없는) 관심종목."""
     names = {}
     for r in volume() + history():
         if r["name"]:
             names[r["code"]] = r["name"]
+    known = set(names.values())
+    for m in manual_stocks():
+        if m["name"] not in known:
+            names["@" + m["name"]] = m["name"]
     return sorted(({"code": c, "name": n} for c, n in names.items()), key=lambda s: s["name"])
 
 
@@ -179,9 +220,14 @@ def stock_card(code):
         for t in split_themes(r["theme"]):
             if t not in themes:
                 themes.append(t)
+    mine = next((m for m in manual_stocks() if m["name"] == name_of(code)), None)
+    for t in split_themes(mine["theme"] if mine else ""):
+        if t not in themes:
+            themes.append(t)
     an = amount_notes().get(code, {"info": "", "memo": ""})
     return {"info": note["info"], "memo": note["memo"], "themes": themes,
-            "amount_info": an["info"], "amount_memo": an["memo"]}
+            "amount_info": an["info"], "amount_memo": an["memo"],
+            "interest": mine is not None, "comment": mine["comment"] if mine else ""}
 
 
 def stock_events(code):
@@ -202,13 +248,26 @@ def stock_timeline(code):
 
 
 def all_themes():
-    """일지 이력과 거래대금상위에 적힌 테마 전부."""
+    """일지 이력·거래대금상위·관심종목에 적힌 테마 전부."""
     seen = set()
     for r in history() + volume():
         seen.update(split_themes(r["theme"]))
+    for m in manual_stocks():
+        seen.update(split_themes(m["theme"]))
     return sorted(seen)
 
 
+def latest_record(code):
+    """그 종목의 가장 최근 기록(일지·거래대금 날짜를 합친 것) = stock_timeline 의 첫 줄, 없으면 None."""
+    tl = stock_timeline(code)
+    return tl[0] if tl else None
+
+
 def theme_events(theme):
+    """그 테마가 적힌 줄들. 관심종목에 직접 넣은 종목은 날짜 없는 줄(date '', manual True)로 더한다."""
     rows = [r for r in history() + volume() if theme in split_themes(r["theme"])]
+    for m in manual_stocks():
+        if theme in split_themes(m["theme"]):
+            rows.append({"date": "", "code": manual_code(m["name"]), "name": m["name"], "pct": None,
+                         "grp": "surge", "manual": True})
     return sorted(rows, key=lambda r: (r["date"], r["pct"] or 0), reverse=True)

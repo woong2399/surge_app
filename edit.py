@@ -218,6 +218,103 @@ def form(key, sections, on_save):
         st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
 
 
+MANUAL_TAB = "관심종목"  # 사용자가 직접 넣은 종목 (name, theme, comment=한줄평, added). 다른 스크립트는 이 탭을 쓰지 않는다.
+
+
+def _manual(create=False):
+    """관심종목 탭과 (전체 값, 칸 제목→번호). 탭이 없으면 create 일 때만 만든다."""
+    import gspread
+    ss = _client().open_by_key(db.AMOUNT_SHEET_ID)
+    try:
+        ws = ss.worksheet(MANUAL_TAB)
+    except gspread.WorksheetNotFound:
+        if not create:
+            return None, [], {}
+        ws = ss.add_worksheet(MANUAL_TAB, rows=200, cols=4)
+        ws.update(range_name="A1:D1", values=[["name", "theme", "comment", "added"]])
+    vals = ws.get_all_values()
+    return ws, vals, {n: i for i, n in enumerate(vals[0])}
+
+
+def _cell(r, h, f):
+    return r[h[f]].strip() if h[f] < len(r) else ""
+
+
+def add_to_interest(names, theme=""):
+    """종목명(코드 없이)을 관심종목에 넣는다. 이미 있으면 theme 이 있을 때 테마만 더한다.
+    (새로 만든 종목 수, 테마를 더한 종목 수)를 돌려준다."""
+    from datetime import datetime
+    ws, vals, h = _manual(create=True)
+    have = {_cell(r, h, "name"): (i, r) for i, r in enumerate(vals[1:], start=2) if _cell(r, h, "name")}
+    th = db.split_themes(_clean(theme))
+    new_rows, upd, seen = [], {}, set()
+    for name in names:
+        name = " ".join((name or "").split())
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        if name in have:
+            i, r = have[name]
+            cur = db.split_themes(_cell(r, h, "theme"))
+            merged = cur + [t for t in th if t not in cur]
+            if merged != cur:
+                upd[(i, "theme")] = ", ".join(merged)
+        else:
+            row = [""] * len(vals[0])
+            row[h["name"]], row[h["theme"]] = name, ", ".join(th)
+            if "added" in h:
+                row[h["added"]] = datetime.now().strftime("%Y-%m-%d")
+            new_rows.append(row)
+    _write(ws, h, upd)
+    if new_rows:
+        ws.append_rows(new_rows, value_input_option="RAW")
+    if upd or new_rows:
+        st.cache_data.clear()
+    return len(new_rows), len(upd)
+
+
+def save_manual(name, theme=None, comment=None):
+    """관심종목의 테마·한줄평을 고친다(None 이면 그 칸은 그대로). 줄이 없으면 False."""
+    ws, vals, h = _manual()
+    for i, r in enumerate(vals[1:], start=2):
+        if _cell(r, h, "name") == name:
+            upd = {}
+            if theme is not None:
+                upd[(i, "theme")] = ", ".join(db.split_themes(_clean(theme)))
+            if comment is not None:
+                upd[(i, "comment")] = " ".join(comment.split())  # 한줄평은 한 줄로
+            _write(ws, h, upd)
+            st.cache_data.clear()
+            return True
+    return False
+
+
+def remove_manual(name):
+    """관심종목에서 종목을 뺀다(줄 삭제). 지운 줄이 있으면 True."""
+    ws, vals, h = _manual()
+    for i, r in enumerate(vals[1:], start=2):
+        if _cell(r, h, "name") == name:
+            ws.delete_rows(i)
+            st.cache_data.clear()
+            return True
+    return False
+
+
+def remove_theme(names, theme):
+    """관심종목 줄들에서 테마 하나만 뺀다(종목은 관심종목에 남는다). 바뀐 줄 수를 돌려준다."""
+    ws, vals, h = _manual()
+    upd = {}
+    for i, r in enumerate(vals[1:], start=2):
+        if _cell(r, h, "name") in names:
+            cur = db.split_themes(_cell(r, h, "theme"))
+            if theme in cur:
+                upd[(i, "theme")] = ", ".join(t for t in cur if t != theme)
+    _write(ws, h, upd)
+    if upd:
+        st.cache_data.clear()
+    return len(upd)
+
+
 def save_memo(code, memo):
     """amount 종목 탭에서 code 줄의 memo 칸을 바꾼다. 줄이 없으면 False."""
     ws = _ws("종목")

@@ -18,19 +18,24 @@ if not stocks:
     st.info("아직 올라온 종목이 없습니다.")
     st.stop()
 
+def lab(s):
+    """목록 글자: '이름  코드'. 코드 없이 관심종목에만 있는 종목은 코드 자리에 ⭐."""
+    return f"{s['name']}  {'⭐' if s['code'].startswith('@') else s['code']}"
+
+
 # 이슈·테마 화면의 카드를 누르면(?code=코드) 그 종목이 골라진 채로 열린다.
 want = st.query_params.get("code")
 if want:
     hit = next((s for s in stocks if s["code"] == want), None)
     if hit:
         st.session_state["stock_q"] = ""
-        st.session_state["stock_pick"] = f"{hit['name']}  {hit['code']}"
+        st.session_state["stock_pick"] = lab(hit)
     del st.query_params["code"]
 
 c1, c2 = st.columns([1, 1.4])
 q = c2.text_input("검색", placeholder="🔍 종목명·코드 검색", label_visibility="collapsed", key="stock_q").strip().lower()
 shown = [s for s in stocks if q in f"{s['name']} {s['code']}".lower()]
-labels = {f"{s['name']}  {s['code']}": s for s in shown}
+labels = {lab(s): s for s in shown}
 choice = c1.selectbox("종목", list(labels), label_visibility="collapsed", key="stock_pick") if labels else None
 
 if not choice:
@@ -39,7 +44,7 @@ if not choice:
 
 code, name = labels[choice]["code"], labels[choice]["name"]
 card = db.stock_card(code)
-ui.setup(name, code)
+ui.setup(name, "직접 추가한 종목 · 일지·거래대금에 나온 적 없음" if code.startswith("@") else code)
 tl = db.stock_timeline(code)
 WD = "월화수목금토일"
 
@@ -66,6 +71,17 @@ def themes_of(e):
 if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
     import edit
     if not edit.unlocked():
+        st.stop()
+    mine = next((m for m in db.manual_stocks() if m["name"] == name), None)
+    if mine:  # 관심종목: 테마와 한줄평
+        edit.form(f"mine_form_{name}", [("⭐ 관심종목 · 테마와 한줄평", [
+            {"id": name, "title": name, "fields": [("theme", "테마 (쉼표로 여러 개)", mine["theme"]),
+                                                  ("comment", "📝 한줄평", mine["comment"])]}])],
+            lambda ch: sum(bool(edit.save_manual(n, **f)) for n, f in ch.items()))
+    elif st.button("⭐ 관심종목에 추가", key=f"fav_{code}", use_container_width=True):
+        edit.add_to_interest([name])
+        st.rerun()
+    if code.startswith("@"):  # 일지·거래대금에 나온 적 없는 종목은 날짜별 기록이 없다
         st.stop()
     if code in db.amount_notes():
         with st.form(f"memo_form_{code}"):
@@ -98,6 +114,13 @@ if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
 
     edit.form(f"stk_form_{code}", [("날짜별 테마·이슈 · 최신순", items)], on_save)
     st.stop()
+
+if card["interest"]:
+    st.markdown("<div class='sec'>⭐ 관심종목 · 한줄평</div>", unsafe_allow_html=True)
+    if card["comment"]:
+        st.markdown(f"<div class='box'>📝 {html.escape(card['comment'])}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='empty'>아직 한줄평이 없습니다. ✏️ 입력을 켜서 적어 보세요.</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='sec'>테마</div>", unsafe_allow_html=True)
 if card["themes"]:
