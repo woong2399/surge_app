@@ -17,6 +17,10 @@ if not themes:
     st.info("아직 입력된 테마가 없습니다. 종목 화면에서 테마를 적으면 여기에 나옵니다.")
     st.stop()
 
+goto = st.session_state.pop("thm_goto", None)  # 이름을 바꾼 직후엔 그 새 이름의 테마로
+if goto in themes:
+    st.session_state["theme_pick"] = goto
+    st.session_state["theme_q"] = ""
 if st.query_params.get("theme") in themes:  # 종목 화면에서 돌아왔으면 보던 테마로
     st.session_state["theme_pick"] = st.query_params["theme"]
     st.session_state["theme_q"] = ""
@@ -42,6 +46,37 @@ for code, evs in by.items():
 cards.sort(key=lambda c: (c[0], c[1]), reverse=True)
 
 ui.setup(theme, f"종목 {len(cards)}개 · 최근에 나온 순")
+
+
+def _do_rename(old, key):
+    """'바꾸기' 버튼: 모든 탭에서 이름을 바꾸고 새 이름의 테마 화면으로 간다."""
+    import edit
+    try:
+        n, final = edit.rename_theme(old, st.session_state.get(key, ""))
+        st.session_state["thm_goto"] = final
+        st.toast(f"바꿨습니다 · {n}칸", icon="✅")
+    except Exception as e:
+        st.toast(f"바꾸지 못했습니다: {str(e)[:100]}", icon="⚠️")
+
+
+with st.expander("🛠 테마 정리 (이름 바꾸기·합치기)"):
+    import edit
+    if edit.unlocked():
+        kn = f"ren_{theme}"
+        new = st.text_input("새 이름", key=kn, placeholder=f"‘{theme}’ 의 새 이름 (이미 있는 테마면 합쳐집니다)",
+                            label_visibility="collapsed")
+        if new.strip():
+            try:
+                pv = edit.rename_preview(theme, new)
+            except ValueError as e:
+                st.caption(f"⚠️ {e}")
+            else:
+                st.markdown(f"**{theme}** → **{pv['final']}**  ·  이력 {pv['이력']}칸 · 거래대금상위 {pv['거래대금상위']}칸 · 관심종목 {pv['관심종목']}칸이 바뀝니다")
+                if pv["merged"]:
+                    st.caption(f"이미 있는 테마 ‘{pv['final']}’ 와 하나로 합쳐집니다.")
+                elif pv["similar"]:
+                    st.caption(f"비슷한 기존 테마가 있어요: {' / '.join(pv['similar'])} — 합치려면 그 이름으로 쓰세요.")
+                st.button("바꾸기", key=f"ren_go_{theme}", on_click=_do_rename, args=(theme, kn))
 if not cards:
     st.markdown("<div class='empty'>이 테마를 쓰는 종목이 아직 없습니다.</div>", unsafe_allow_html=True)
 

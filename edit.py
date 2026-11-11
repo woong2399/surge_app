@@ -484,6 +484,79 @@ def theme_select(label, value, key, kind, args, container=None):
                                   placeholder="테마 고르기(스크롤·검색) 또는 새로 쓰기", label_visibility="collapsed")
 
 
+# ── 테마 정리: 이름 바꾸기·합치기 (테마 화면) ─────────────────────────────────────────────
+
+def _final_name(old, new):
+    """새 이름을 정리한다. 이미 있는 다른 테마와 같은 이름(공백·괄호·대소문자만 달라도)이면 그 이름으로 합친다.
+    (정리된 이름, 이미 있는 다른 테마와 합치는지). 쓸 수 없는 이름이면 ValueError."""
+    new = " ".join((new or "").split())
+    if not new:
+        raise ValueError("새 이름이 비었습니다.")
+    if "," in new:
+        raise ValueError("새 이름에는 쉼표를 쓸 수 없습니다. 테마 하나의 이름만 쓰세요.")
+    if new.lower() == "null":
+        raise ValueError("null 은 테마 이름으로 쓸 수 없습니다.")
+    if _norm(new) == _norm(old):  # 띄어쓰기·대소문자만 고치는 경우
+        if new == old:
+            raise ValueError("이름이 그대로입니다.")
+        return new, False
+    by = {_norm(t): t for t in db.all_themes() if t != old}
+    if _norm(new) in by:
+        return by[_norm(new)], True
+    return new, False
+
+
+def rename_preview(old, new):
+    """바꾸면 어떻게 되는지 미리 본다(시트에는 쓰지 않는다). {"final", "merged", "이력", "거래대금상위", "관심종목", "similar"}.
+    쓸 수 없는 이름이면 ValueError."""
+    final, merged = _final_name(old, new)
+    n = lambda rows: sum(1 for r in rows if old in db.split_themes(r["theme"]))
+    others = [t for t in db.all_themes() if t != old]
+    k = _norm(final)
+    lim = 1 if len(k) <= 4 else 2
+    similar = [] if merged else [t for t in others if abs(len(_norm(t)) - len(k)) <= lim and _lev(k, _norm(t)) <= lim][:3]
+    return {"final": final, "merged": merged, "이력": n(db.history()), "거래대금상위": n(db.volume()),
+            "관심종목": n(db.manual_stocks()), "similar": similar}
+
+
+def _replace_tokens(cell, old, to):
+    ts = db.split_themes(cell)
+    if old not in ts:
+        return None
+    out = []
+    for t in ts:
+        t = to if t == old else t
+        if t not in out:  # 이미 있으면 한 번만
+            out.append(t)
+    return ", ".join(out)
+
+
+def rename_theme(old, new):
+    """모든 탭(이력·거래대금상위·관심종목)의 테마 old 를 새 이름으로 바꾸고 테마목록도 맞춘다. 쉼표로 나뉜 테마를 하나씩
+    정확히 비교하므로 다른 이름(반도체(장비) 등)은 건드리지 않는다. (바뀐 칸 수, 최종 이름)을 돌려준다."""
+    final, _ = _final_name(old, new)
+    jobs = []
+    for sid, tab in ((db.AMOUNT_SHEET_ID, "거래대금상위"), (db.sheet_id(), "이력")):
+        ws, vals, h = _load(sid, tab)
+        jobs.append((ws, h, {(i, "theme"): x for i, r in enumerate(vals[1:], start=2)
+                             if (x := _replace_tokens(_cell(r, h, "theme"), old, final)) is not None}))
+    ws, vals, h = _manual()
+    if ws is not None:
+        jobs.append((ws, h, {(i, "theme"): x for i, r in enumerate(vals[1:], start=2)
+                             if (x := _replace_tokens(_cell(r, h, "theme"), old, final)) is not None}))
+    for ws, h, upd in jobs:
+        _write(ws, h, upd)
+    tws, tvals, _h = _tab(THEME_TAB, THEME_HEAD, create=True)  # 테마목록: old 줄을 지우고 새 이름이 없으면 더한다
+    have = {_norm(r[0]) for r in tvals[1:] if r and r[0].strip() and r[0].strip() != old}
+    for i in range(len(tvals) - 1, 0, -1):  # 아래에서부터 지워야 줄 번호가 안 밀린다
+        if tvals[i] and tvals[i][0].strip() == old:
+            tws.delete_rows(i + 1)
+    if _norm(final) not in have:
+        tws.append_rows([[final, _today()]], value_input_option="RAW")
+    st.cache_data.clear()
+    return sum(len(u) for _, _, u in jobs), final
+
+
 def on_reason(date, code, key):
     """거래대금 이유 칸에서 Enter."""
     try:
