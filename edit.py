@@ -23,7 +23,9 @@ def _secret(name):
 
 
 @st.cache_resource(show_spinner=False)
-def _client():
+def _make_client():
+    """키가 있을 때만 접속을 만들어 기억한다. 키가 없으면 오류를 내서 '없음'은 기억하지 않는다
+    (Secrets 를 나중에 넣어도 앱을 다시 켜지 않고 바로 쓰이게)."""
     import gspread
     info = _secret("gcp_service_account")
     if info:
@@ -31,7 +33,14 @@ def _client():
     path = os.environ.get("SURGE_KEY_FILE")
     if path:
         return gspread.service_account(filename=path)
-    return None
+    raise LookupError("no key")
+
+
+def _client():
+    try:
+        return _make_client()
+    except LookupError:
+        return None
 
 
 def available():
