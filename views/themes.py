@@ -17,6 +17,10 @@ if not themes:
     st.info("아직 입력된 테마가 없습니다. 종목 화면에서 테마를 적으면 여기에 나옵니다.")
     st.stop()
 
+if st.query_params.get("theme") in themes:  # 종목 화면에서 돌아왔으면 보던 테마로
+    st.session_state["theme_pick"] = st.query_params["theme"]
+    st.session_state["theme_q"] = ""
+st.query_params.pop("theme", None)
 c1, c2 = st.columns([1, 1.4])
 q = c2.text_input("검색", placeholder="🔍 테마 검색", label_visibility="collapsed", key="theme_q").strip().lower()
 shown = [t for t in themes if q in t.lower()]
@@ -53,5 +57,5 @@ for date_, pct_, code, last, n in cards:
     ui.card(
         last["name"], code=code, pct=pct, meta=meta,
         tag=last.get("grp") == "telegram", themes=card["themes"],
-        text=card["comment"] and f"📝 {card['comment']}" or card["info"], href=f"stocks?code={code}",
+        text=card["comment"] and f"📝 {card['comment']}" or card["info"], href=f"stocks?code={code}&from=themes&theme={theme}",
     )

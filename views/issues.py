@@ -19,7 +19,10 @@ if not dates:
 
 WD = "월화수목금토일"
 c1, c2 = st.columns([1, 1.4])
-day = c1.selectbox("날짜", dates, label_visibility="collapsed")
+if st.query_params.get("day") in dates:  # 종목 화면에서 돌아왔으면 보던 날짜로
+    st.session_state["iss_day"] = st.query_params["day"]
+st.query_params.pop("day", None)
+day = c1.selectbox("날짜", dates, label_visibility="collapsed", key="iss_day")
 q = c2.text_input("검색", placeholder="🔍 종목·테마·이슈 검색", label_visibility="collapsed").strip().lower()
 
 d = datetime.strptime(day, "%Y-%m-%d")
@@ -35,5 +38,5 @@ for r in rows:
     ui.card(
         r["name"], code=r["code"], pct=r["pct"], meta=ui.amount_text(r["amount_est"]),
         tag=r["grp"] == "telegram", themes=db.split_themes(r["theme"]),
-        text=r["telegram"], news=r["news"], href=f"stocks?code={r['code']}", meta2=ui.flow_line(r),
+        text=r["telegram"], news=r["news"], href=f"stocks?code={r['code']}&from=issues&day={day}", meta2=ui.flow_line(r),
     )

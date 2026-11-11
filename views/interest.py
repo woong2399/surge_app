@@ -31,5 +31,5 @@ for m in items:
         meta = "아직 일지·거래대금에 나온 적 없음"
     ui.card(
         m["name"], code=code, pct=row["pct"] if row else None, meta=meta, themes=card["themes"],
-        text=f"📝 {m['comment']}" if m["comment"] else "", href=f"stocks?code={code}",
+        text=f"📝 {m['comment']}" if m["comment"] else "", href=f"stocks?code={code}&from=interest",
     )

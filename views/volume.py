@@ -28,6 +28,9 @@ if not dates:
     st.stop()
 
 c1, c2 = st.columns([1, 1.4])
+if st.query_params.get("day") in dates:  # 종목 화면에서 돌아왔으면 보던 날짜로
+    st.session_state["vol_day"] = st.query_params["day"]
+st.query_params.pop("day", None)
 day = c1.selectbox("날짜", dates, label_visibility="collapsed", key="vol_day")
 q = c2.text_input("검색", placeholder="🔍 종목·테마·이유 검색", label_visibility="collapsed", key="vol_q").strip().lower()
 
@@ -67,7 +70,7 @@ def show(r, skip=None):
         ("👑 " if r["leader"] else "") + r["name"], code=r["code"], pct=r["pct"], meta=" · ".join(meta),
         meta2=flow.split(" · ", 1)[1] if flow else "",  # 순위는 위 줄에 있으니 뺀다
         themes=[x for x in db.split_themes(r["theme"]) if x != skip],
-        text=r["reason"], href=f"stocks?code={r['code']}",
+        text=r["reason"], href=f"stocks?code={r['code']}&from=volume&day={day}",
     )
 
 

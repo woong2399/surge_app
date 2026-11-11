@@ -426,7 +426,7 @@ def _apply_theme(kind, args, key, items):
             save_day_theme(args[0], args[1], text)
         else:
             save_manual(args[0], theme=text)
-        st.session_state[key] = text  # 칸에는 연결된(고쳐진) 이름을 보여 준다
+        st.session_state[key] = db.split_themes(text)  # 칸에는 연결된(고쳐진) 이름을 보여 준다
         st.toast("저장했습니다", icon="✅")
     except Exception as e:
         st.toast(f"저장하지 못했습니다: {str(e)[:100]}", icon="⚠️")
@@ -434,7 +434,8 @@ def _apply_theme(kind, args, key, items):
 
 def on_theme(kind, args, key):
     """테마 칸에서 Enter. kind: 'day'(날짜별, args=(날짜, 코드)) 또는 'manual'(관심종목, args=(코드,))."""
-    items = theme_resolve(st.session_state.get(key, ""))
+    raw = st.session_state.get(key, "")
+    items = theme_resolve(", ".join(raw) if isinstance(raw, list) else raw)
     if any(isinstance(i, tuple) for i in items):  # 오타 같은 게 있으면 저장하지 않고 먼저 물어본다
         st.session_state["theme_pending"] = {"kind": kind, "args": args, "key": key, "items": items}
         return
@@ -452,7 +453,9 @@ def _ask_pick(i, name):
 
 
 def _ask_cancel():
-    st.session_state.pop("theme_pending", None)
+    p = st.session_state.pop("theme_pending", None)
+    if p:
+        st.session_state.pop(p["key"], None)  # 칸을 원래 값으로 되돌린다
 
 
 def theme_ask_ui():
@@ -470,6 +473,15 @@ def theme_ask_ui():
         c.button(cand, key=f"ta_{i}_{cand}", on_click=_ask_pick, args=(i, cand))
     cols[-2].button(f"새 테마 ‘{typed}’", key=f"ta_new_{i}", on_click=_ask_pick, args=(i, typed))
     cols[-1].button("취소", key=f"ta_cancel_{i}", on_click=_ask_cancel)
+
+
+def theme_select(label, value, key, kind, args, container=None):
+    """테마 칸: 스크롤·검색으로 고르거나 새로 쓸 수 있는 선택 목록(여러 개). 바꾸면 바로 저장한다(오타 같으면 먼저 물어봄).
+    value 는 지금 값(쉼표로 이은 글), kind·args 는 on_theme 참고."""
+    cur = db.split_themes(value)
+    (container or st).multiselect(label, sorted(set(db.all_themes()) | set(cur)), default=cur, key=key,
+                                  on_change=on_theme, args=(kind, args, key), accept_new_options=True,
+                                  placeholder="테마 고르기(스크롤·검색) 또는 새로 쓰기", label_visibility="collapsed")
 
 
 def on_reason(date, code, key):

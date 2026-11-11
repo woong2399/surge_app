@@ -23,6 +23,15 @@ def lab(s):
     return f"{s['name']}  {s['code']}"
 
 
+# 카드를 눌러 들어오면 어느 화면에서 왔는지(from)와 그 화면의 날짜·테마를 기억해 둔다 → 나중에 그 화면으로 돌아간다.
+BACK = {"issues": ("views/issues.py", "이슈"), "volume": ("views/volume.py", "거래대금"),
+        "themes": ("views/themes.py", "테마"), "interest": ("views/interest.py", "관심종목")}
+if st.query_params.get("from") in BACK:
+    st.session_state["stk_back"] = (st.query_params["from"],
+                                    {k: st.query_params[k] for k in ("day", "theme") if k in st.query_params})
+for _k in ("from", "day", "theme"):
+    st.query_params.pop(_k, None)
+
 # 이슈·테마 화면의 카드를 누르면(?code=코드) 그 종목이 골라진 채로 열린다.
 want = st.query_params.get("code")
 if want:
@@ -47,6 +56,9 @@ card = db.stock_card(code)
 tl = db.stock_timeline(code)
 ui.setup(name, code if tl else f"{code} · 아직 일지·거래대금에 나온 적 없음")
 WD = "월화수목금토일"
+back = st.session_state.get("stk_back")
+if back:
+    st.page_link(BACK[back[0]][0], label=f"← {BACK[back[0]][1]} 화면으로", query_params=back[1])
 
 
 def badges(e):
@@ -70,9 +82,15 @@ def themes_of(e):
 
 import edit  # noqa: E402
 
-if st.toggle("✏️ 수정", key=f"stk_edit_{code}"):
+ktog = f"stk_edit_{code}"
+on = st.toggle("✏️ 수정", key=ktog)
+was = st.session_state.get(ktog + "_was", False)
+st.session_state[ktog + "_was"] = on
+if was and not on and back:  # 수정을 마치고 끄면 왔던 화면으로 돌아간다
+    st.switch_page(BACK[back[0]][0], query_params=back[1])
+if on:
     if edit.unlocked():
-        edit.banner("쓰고 Enter 를 누르면 바로 저장됩니다 · 수정할 수 있는 건 테마, 거래대금 이유, 한줄평입니다")
+        edit.banner("고르거나 쓰고 Enter 를 누르면 바로 저장됩니다 · 수정할 수 있는 건 테마, 거래대금 이유, 한줄평입니다")
         edit.theme_ask_ui()  # 오타 같은 테마를 썼으면 여기서 '혹시 ○○?' 하고 묻는다
         mine = next((m for m in db.manual_stocks() if m["code"] == code), None)
         kf = f"fav_chk_{code}"
@@ -81,8 +99,7 @@ if st.toggle("✏️ 수정", key=f"stk_edit_{code}"):
             kc, kt = f"cmt_{code}", f"mth_{code}"
             st.text_input("한줄평", value=mine["comment"], key=kc, on_change=edit.on_comment, args=(code, kc),
                           placeholder="📝 한줄평 (쓰고 Enter)", label_visibility="collapsed")
-            st.text_input("관심 테마", value=mine["theme"], key=kt, on_change=edit.on_theme, args=("manual", (code,), kt),
-                          placeholder="관심 테마 (쉼표로 여러 개, 쓰고 Enter)", label_visibility="collapsed")
+            edit.theme_select("관심 테마", mine["theme"], kt, "manual", (code,))
         for e in tl:
             d = e["date"]
             st.markdown(f"<div class='ft'>{d} · {' '.join(badges(e))}</div>", unsafe_allow_html=True)
@@ -93,8 +110,7 @@ if st.toggle("✏️ 수정", key=f"stk_edit_{code}"):
                              placeholder="📌 거래대금 이유 (Enter)", label_visibility="collapsed")
             else:
                 a = st
-            a.text_input("테마", value=", ".join(themes_of(e)), key=ka, on_change=edit.on_theme, args=("day", (d, code), ka),
-                         placeholder="테마 (쉼표로 여러 개, Enter)", label_visibility="collapsed")
+            edit.theme_select("테마", ", ".join(themes_of(e)), ka, "day", (d, code), container=a)
         if not tl and not mine:
             st.markdown("<div class='empty'>일지·거래대금에 나온 적 없는 종목이에요. ⭐ 관심종목에 넣으면 한줄평과 테마를 적을 수 있습니다.</div>",
                         unsafe_allow_html=True)
