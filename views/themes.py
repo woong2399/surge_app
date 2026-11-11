@@ -88,7 +88,7 @@ for date_, pct_, code, last, n in cards:
         rec = db.latest_record(code)
         row = (rec["hist"] or rec["vol"]) if rec else None
         pct = row["pct"] if row else None
-        meta = "관심종목" + (f" · 최근 기록 {rec['date'][5:]}" if rec else " · 아직 일지·거래대금에 나온 적 없음")
+        meta = "내 종목" + (f" · 최근 기록 {rec['date'][5:]}" if rec else " · 아직 일지·거래대금에 나온 적 없음")
     ui.card(
         last["name"], code=code, pct=pct, meta=meta,
         tag=last.get("grp") == "telegram", themes=card["themes"],

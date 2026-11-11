@@ -576,14 +576,14 @@ def on_comment(code, key):
 
 
 def on_interest(code, key):
-    """'⭐ 관심종목' 체크: 켜면 넣고, 끄면 뺀다(한줄평·관심 테마도 함께 지워진다)."""
+    """'⭐ 내 종목' 체크: 켜면 넣고, 끄면 뺀다(한줄평·테마도 함께 지워진다)."""
     try:
         if st.session_state.get(key):
             add_to_interest([code])
-            st.toast("관심종목에 넣었습니다", icon="⭐")
+            st.toast("내 종목에 넣었습니다", icon="⭐")
         else:
             remove_manual(code)
-            st.toast("관심종목에서 뺐습니다", icon="✅")
+            st.toast("내 종목에서 뺐습니다", icon="✅")
     except Exception as e:
         st.toast(f"처리하지 못했습니다: {str(e)[:100]}", icon="⚠️")
 

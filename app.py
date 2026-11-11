@@ -19,6 +19,6 @@ pg = st.navigation([
     st.Page("views/volume.py", title="거래대금"),
     st.Page("views/stocks.py", title="종목"),
     st.Page("views/themes.py", title="테마"),
-    st.Page("views/interest.py", title="관심종목"),
+    st.Page("views/interest.py", title="내 종목"),
 ])
 pg.run()

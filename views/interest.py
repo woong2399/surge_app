@@ -11,10 +11,10 @@ import ui  # noqa: E402
 ui.need_token()
 
 items = db.manual_stocks()  # 최근에 넣은 종목이 앞
-ui.setup("관심종목", f"{len(items)}종목 · 최근에 넣은 순" if items else "공부하고 싶은 종목을 넣어 두는 곳")
+ui.setup("내 종목", f"{len(items)}종목 · 최근에 넣은 순" if items else "공부하고 싶은 종목을 넣어 두는 곳")
 
 if not items:
-    st.markdown("<div class='empty'>아직 없습니다. 종목 화면에서 종목을 고르고 ✏️ 수정을 켠 뒤 ⭐ 관심종목을 체크하세요.</div>",
+    st.markdown("<div class='empty'>아직 없습니다. 종목 화면에서 종목을 고르고 ✏️ 수정을 켠 뒤 ⭐ 내 종목을 체크하세요.</div>",
                 unsafe_allow_html=True)
 
 for m in items:

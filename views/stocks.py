@@ -25,7 +25,7 @@ def lab(s):
 
 # 카드를 눌러 들어오면 어느 화면에서 왔는지(from)와 그 화면의 날짜·테마를 기억해 둔다 → 나중에 그 화면으로 돌아간다.
 BACK = {"issues": ("views/issues.py", "이슈"), "volume": ("views/volume.py", "거래대금"),
-        "themes": ("views/themes.py", "테마"), "interest": ("views/interest.py", "관심종목")}
+        "themes": ("views/themes.py", "테마"), "interest": ("views/interest.py", "내 종목")}
 if st.query_params.get("from") in BACK:
     st.session_state["stk_back"] = (st.query_params["from"],
                                     {k: st.query_params[k] for k in ("day", "theme") if k in st.query_params})
@@ -40,6 +40,41 @@ if want:
         st.session_state["stock_q"] = ""
         st.session_state["stock_pick"] = lab(hit)
     del st.query_params["code"]
+
+# ── 종목 추가: 종목명을 고르고 테마를 정하면 바로 '내 종목'에 들어간다 (일지·거래대금에 나온 적 없는 종목도 됨) ──
+def _do_add(items, code):
+    try:
+        names = edit._commit_names(items)
+        edit.add_to_interest([code], ", ".join(names))
+        st.session_state["stock_q"] = ""
+        st.session_state["stock_pick"] = next(lab(s) for s in stocks if s["code"] == code)
+        st.session_state.pop("add_pending", None)
+        st.session_state["add_name"] = None
+        st.session_state["add_themes"] = []
+        st.toast("종목을 추가했습니다", icon="✅")
+    except Exception as e:
+        st.toast(f"추가하지 못했습니다: {str(e)[:100]}", icon="⚠️")
+
+
+import edit  # noqa: E402
+
+with st.expander("➕ 종목 추가"):
+    if edit.unlocked():
+        by_lab = {lab(s): s for s in stocks}
+        ca, cb, cc = st.columns([1.1, 1.4, 0.45], vertical_alignment="center")
+        pick = ca.selectbox("종목 추가", list(by_lab), index=None, key="add_name", placeholder="종목명",
+                            label_visibility="collapsed")
+        ths = cb.multiselect("테마", sorted(set(db.all_themes())), key="add_themes", accept_new_options=True,
+                             placeholder="테마(고르거나 쓰기)", label_visibility="collapsed")
+        fixed, ok = [], bool(pick)
+        for r in edit.theme_resolve(", ".join(ths)):
+            if isinstance(r, tuple):  # 오타 같은 테마: 후보 중에서 고르게 한다
+                _, typed, cands = r
+                ch = st.radio(f"‘{typed}’ 는 비슷한 테마가 있어요", cands + [f"새 테마 ‘{typed}’"], key=f"add_fix_{typed}", horizontal=True)
+                fixed.append(typed if ch.startswith("새 테마") else ch)
+            else:
+                fixed.append(r)
+        cc.button("추가", key="add_go", disabled=not ok, on_click=_do_add, args=(fixed, by_lab[pick]["code"] if pick else ""))
 
 c1, c2 = st.columns([1, 1.4])
 q = c2.text_input("검색", placeholder="🔍 종목명·코드 검색", label_visibility="collapsed", key="stock_q").strip().lower()
@@ -94,12 +129,12 @@ if on:
         edit.theme_ask_ui()  # 오타 같은 테마를 썼으면 여기서 '혹시 ○○?' 하고 묻는다
         mine = next((m for m in db.manual_stocks() if m["code"] == code), None)
         kf = f"fav_chk_{code}"
-        st.checkbox("⭐ 관심종목", value=bool(mine), key=kf, on_change=edit.on_interest, args=(code, kf))
+        st.checkbox("⭐ 내 종목", value=bool(mine), key=kf, on_change=edit.on_interest, args=(code, kf))
         if mine:
             kc, kt = f"cmt_{code}", f"mth_{code}"
             st.text_input("한줄평", value=mine["comment"], key=kc, on_change=edit.on_comment, args=(code, kc),
                           placeholder="📝 한줄평 (쓰고 Enter)", label_visibility="collapsed")
-            edit.theme_select("관심 테마", mine["theme"], kt, "manual", (code,))
+            edit.theme_select("테마", mine["theme"], kt, "manual", (code,))
         for e in tl:
             d = e["date"]
             st.markdown(f"<div class='ft'>{d} · {' '.join(badges(e))}</div>", unsafe_allow_html=True)
@@ -112,12 +147,12 @@ if on:
                 a = st
             edit.theme_select("테마", ", ".join(themes_of(e)), ka, "day", (d, code), container=a)
         if not tl and not mine:
-            st.markdown("<div class='empty'>일지·거래대금에 나온 적 없는 종목이에요. ⭐ 관심종목에 넣으면 한줄평과 테마를 적을 수 있습니다.</div>",
+            st.markdown("<div class='empty'>일지·거래대금에 나온 적 없는 종목이에요. ⭐ 내 종목에 넣으면 한줄평과 테마를 적을 수 있습니다.</div>",
                         unsafe_allow_html=True)
         st.stop()
 
 if card["interest"]:
-    st.markdown("<div class='sec'>⭐ 관심종목 · 한줄평</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sec'>⭐ 내 종목 · 한줄평</div>", unsafe_allow_html=True)
     if card["comment"]:
         st.markdown(f"<div class='box'>📝 {html.escape(card['comment'])}</div>", unsafe_allow_html=True)
     else:
