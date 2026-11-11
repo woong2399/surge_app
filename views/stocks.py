@@ -145,11 +145,6 @@ if card["memo"]:
     st.markdown("<div class='sec'>메모</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='box'>{html.escape(card['memo'])}</div>", unsafe_allow_html=True)
 
-if card["amount_info"] or card["amount_memo"]:
-    st.markdown("<div class='sec'>종목 이슈</div>", unsafe_allow_html=True)
-    body = "\n\n".join(x for x in [card["amount_info"], card["amount_memo"]] if x)
-    st.markdown(f"<div class='box'>{html.escape(body)}</div>", unsafe_allow_html=True)
-
 # 일지(10%↑)와 거래대금 상위 30을 날짜 하나로 합쳐 보여 준다 (카드마다 표시가 붙어 있어 횟수 요약은 두지 않는다)
 st.markdown("<div class='sec'>날짜별 기록 · 최신순</div>", unsafe_allow_html=True)
 if not tl:

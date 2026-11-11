@@ -1,8 +1,8 @@
-"""구글 시트 surge 를 직접 읽는다. 시트에서 고치면 1분 안에 화면에 반영된다.
+"""구글 시트(amount 시트 하나)를 읽는다. 시트에서 고치면 1분 안에 화면에 반영된다.
 
-읽는 곳: 시트의 `이력` 탭(date, code, name, pct, amount_est, theme, telegram, news)과 `종목` 탭(code, name, …, D열 종목 정보, E열 메모).
-시트는 '링크가 있는 누구나 보기'로 열려 있어야 한다(CSV 로 읽는다). 쓰지는 않는다.
-시트 id 는 환경변수·Streamlit secrets 의 SURGE_SHEET_ID 로 바꿀 수 있다(없으면 아래 기본값).
+읽는 곳(탭): 이력(date, code, name, pct, amount_est, theme, telegram, news, …) · 거래대금상위 · 종목(code, name, theme, info, memo, …)
+· 관심종목 · 종목목록 · 테마목록. 2026-11-11 에 예전 surge 시트를 이 시트로 합쳤다(예전 surge 시트는 백업).
+서비스 계정 키(Streamlit Secrets)로 읽는다. 키가 없는 컴퓨터에서는 시트가 '링크가 있는 누구나 보기'여야 CSV 로 읽힌다.
 """
 import os
 import re
@@ -11,27 +11,17 @@ import urllib.parse
 import pandas as pd
 import streamlit as st
 
-DEFAULT_SHEET_ID = "1SpHykeusHQ9PjYCu2W46DJrbgDKmcdmWfjfcaLkgOkM"
+AMOUNT_SHEET_ID = "16G7kVUSJokomw7tq42VVBjelgFoW1mQmA34_Nh2HnC0"  # 모든 탭이 있는 시트 하나
 TTL = 60  # 초: 시트를 고친 뒤 화면에 반영되기까지 최대 시간
 
 
 def sheet_id():
-    t = os.environ.get("SURGE_SHEET_ID")
-    if t:
-        return t
-    try:
-        if "SURGE_SHEET_ID" in st.secrets:
-            return st.secrets["SURGE_SHEET_ID"]
-    except Exception:
-        pass
-    return DEFAULT_SHEET_ID
-
-
-AMOUNT_SHEET_ID = "16G7kVUSJokomw7tq42VVBjelgFoW1mQmA34_Nh2HnC0"  # 거래대금상위 탭이 있는 amount 시트
+    """예전 이름(이력 탭이 있던 surge 시트). 지금은 시트가 하나라 같은 주소를 돌려준다."""
+    return AMOUNT_SHEET_ID
 
 
 def _csv(tab, sid=None):
-    if sid == AMOUNT_SHEET_ID:  # 서비스 계정 키가 있으면 그걸로 읽는다(링크 공개가 꺼져 있어도 됨)
+    if sid in (None, AMOUNT_SHEET_ID):  # 서비스 계정 키가 있으면 그걸로 읽는다(링크 공개가 꺼져 있어도 됨)
         import edit
         vals = edit.read_values(tab)
         if vals:
@@ -134,21 +124,9 @@ def stock_volume_events(code):
 
 @st.cache_data(ttl=TTL, show_spinner=False)
 def stock_notes():
-    """종목 탭 → {code: {info, memo}}"""
-    df = _csv("종목")
-    out = {}
-    for r in df.iloc[:, :5].itertuples(index=False):
-        code = str(r[0]).strip()
-        if code:
-            out[code] = {"info": str(r[3]).strip(), "memo": str(r[4]).strip()}
-    return out
-
-
-@st.cache_data(ttl=TTL, show_spinner=False)
-def amount_notes():
-    """amount 시트 종목 탭 → {code: {info, memo}} (surge 시트 종목 탭과 따로 관리)."""
+    """종목 탭 → {code: {info, memo}} (첫 줄 제목 info·memo 로 찾는다)."""
     try:
-        df = _csv("종목", AMOUNT_SHEET_ID)
+        df = _csv("종목")
     except Exception:
         return {}
     return {v["code"]: {"info": v.get("info", ""), "memo": v.get("memo", "")}
@@ -248,9 +226,7 @@ def stock_card(code):
     for t in split_themes(mine["theme"] if mine else ""):
         if t not in themes:
             themes.append(t)
-    an = amount_notes().get(code, {"info": "", "memo": ""})
     return {"info": note["info"], "memo": note["memo"], "themes": themes,
-            "amount_info": an["info"], "amount_memo": an["memo"],
             "interest": mine is not None, "comment": mine["comment"] if mine else ""}
 
 
