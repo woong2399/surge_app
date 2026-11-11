@@ -80,9 +80,9 @@ if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
     for e in tl:
         fs = [("theme", "테마 (쉼표로 여러 개)", ", ".join(themes_of(e)))]
         if e["hist"]:
-            fs.append(("telegram", "일지 이슈", e["hist"]["telegram"]))
+            fs.append(("telegram", "✈️ 일지 이슈", e["hist"]["telegram"]))
         if e["vol"]:
-            fs.append(("reason", "거래대금 이유", e["vol"]["reason"]))
+            fs.append(("reason", "💰 거래대금 이유", e["vol"]["reason"]))
         items.append({"id": e["date"], "title": " · ".join([e["date"]] + badges(e)), "fields": fs})
     has = {e["date"]: e for e in tl}
 
@@ -138,7 +138,8 @@ for e in tl:
     flow = ui.flow_line(v or h)
     if v and flow:
         flow = flow.split(" · ", 1)[1]  # 순위는 표시에 있으니 뺀다
-    text = "\n".join(x for x in [h["telegram"] if h else "", f"거래대금 이유: {v['reason']}" if v and v["reason"] else ""] if x)
+    text = "\n".join(x for x in [f"✈️ {h['telegram']}" if h and h["telegram"] else "",
+                                 f"💰 {v['reason']}" if v and v["reason"] else ""] if x)  # 아이콘 하나로 출처 구분
     ui.card(
         ("👑 " if v and v["leader"] else "") + f"{d} ({wd})", pct=h["pct"] if h else v["pct"],
         meta=" · ".join(badges(e) + [x for x in [size, ui.cap_text(v) if v else ""] if x]),
