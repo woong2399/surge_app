@@ -28,16 +28,6 @@ if q:
     rows = [r for r in rows if q in f"{r['name']} {r['code']} {r['telegram']} {r['theme']}".lower()]
 
 ui.setup(f"{d.month}월 {d.day}일 {WD[d.weekday()]}요일", f"{len(rows)}종목 · 등락률 높은 순")
-if st.toggle("✏️ 테마·이슈 입력", key="iss_edit"):
-    import edit
-    if edit.unlocked():
-        edit.theme_box()
-        edit.form(f"iss_form_{day}", [("", [
-            {"id": (day, r["code"]), "title": f"{r['name']} · {r['pct']:+.2f}%",
-             "fields": [("theme", "테마", r["theme"], "theme"), ("telegram", "이슈", r["telegram"])]}
-            for r in rows])], lambda ch: edit.save(hist_edits=ch))
-        st.caption("같은 날 거래대금 상위에 같은 종목이 있고 그쪽 테마가 비어 있으면 같이 채워집니다.")
-    st.stop()
 if not rows:
     st.markdown("<div class='empty'>조건에 맞는 종목이 없습니다.</div>", unsafe_allow_html=True)
 

@@ -68,66 +68,44 @@ def themes_of(e):
     return out
 
 
-if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
-    import edit
-    if not edit.unlocked():
-        st.stop()
-    edit.theme_box()
-    mine = next((m for m in db.manual_stocks() if m["code"] == code), None)
-    if mine:  # 관심종목: 테마와 한줄평
-        edit.form(f"mine_form_{code}", [("⭐ 관심종목 · 테마와 한줄평", [
-            {"id": code, "title": name, "fields": [("theme", "테마", mine["theme"], "theme"),
-                                                  ("comment", "📝 한줄평", mine["comment"])]}])],
-            lambda ch: sum(bool(edit.save_manual(c, **f)) for c, f in ch.items()))
-    elif st.button("⭐ 관심종목에 추가", key=f"fav_{code}", use_container_width=True):
-        try:
-            edit.add_to_interest([code])
-            st.rerun()
-        except Exception as e:
-            if type(e).__name__ not in ("RerunException", "StopException"):
-                st.error(f"추가하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
+import edit  # noqa: E402
+
+if st.toggle("✏️ 수정", key=f"stk_edit_{code}"):
+    if edit.unlocked():
+        edit.banner("쓰고 Enter 를 누르면 바로 저장됩니다 · 수정할 수 있는 건 테마, 거래대금 이유, 한줄평입니다")
+        edit.theme_ask_ui()  # 오타 같은 테마를 썼으면 여기서 '혹시 ○○?' 하고 묻는다
+        mine = next((m for m in db.manual_stocks() if m["code"] == code), None)
+        kf = f"fav_chk_{code}"
+        st.checkbox("⭐ 관심종목", value=bool(mine), key=kf, on_change=edit.on_interest, args=(code, kf))
+        if mine:
+            kc, kt = f"cmt_{code}", f"mth_{code}"
+            st.text_input("한줄평", value=mine["comment"], key=kc, on_change=edit.on_comment, args=(code, kc),
+                          placeholder="📝 한줄평 (쓰고 Enter)", label_visibility="collapsed")
+            st.text_input("관심 테마", value=mine["theme"], key=kt, on_change=edit.on_theme, args=("manual", (code,), kt),
+                          placeholder="관심 테마 (쉼표로 여러 개, 쓰고 Enter)", label_visibility="collapsed")
+        for e in tl:
+            d = e["date"]
+            st.markdown(f"<div class='ft'>{d} · {' '.join(badges(e))}</div>", unsafe_allow_html=True)
+            ka, kb = f"th_{d}_{code}", f"rs_{d}_{code}"
+            if e["vol"]:
+                a, b = st.columns([1, 1.4])
+                b.text_input("거래대금 이유", value=e["vol"]["reason"], key=kb, on_change=edit.on_reason, args=(d, code, kb),
+                             placeholder="📌 거래대금 이유 (Enter)", label_visibility="collapsed")
             else:
-                raise
-    if not tl:  # 일지·거래대금에 나온 적 없는 종목은 날짜별 기록이 없다
+                a = st
+            a.text_input("테마", value=", ".join(themes_of(e)), key=ka, on_change=edit.on_theme, args=("day", (d, code), ka),
+                         placeholder="테마 (쉼표로 여러 개, Enter)", label_visibility="collapsed")
+        if not tl and not mine:
+            st.markdown("<div class='empty'>일지·거래대금에 나온 적 없는 종목이에요. ⭐ 관심종목에 넣으면 한줄평과 테마를 적을 수 있습니다.</div>",
+                        unsafe_allow_html=True)
         st.stop()
-    if code in db.amount_notes():
-        with st.form(f"memo_form_{code}"):
-            memo = st.text_area("종목 이슈", value=card["amount_memo"], height=120,
-                                placeholder="이 종목의 이슈를 적어 두세요 (amount 시트 종목 탭 memo 칸)")
-            if st.form_submit_button("종목 이슈 저장", type="primary", use_container_width=True):
-                try:
-                    st.success("저장했습니다." if edit.save_memo(code, memo) else "amount 종목 탭에 이 종목 줄이 없습니다.")
-                except Exception as e:
-                    st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
-    items = []
-    for e in tl:
-        fs = [("theme", "테마", ", ".join(themes_of(e)), "theme")]
-        if e["hist"]:
-            fs.append(("telegram", "💬 일지 이슈", e["hist"]["telegram"]))
-        if e["vol"]:
-            fs.append(("reason", "📌 거래대금 이유", e["vol"]["reason"]))
-        items.append({"id": e["date"], "title": " · ".join([e["date"]] + badges(e)), "fields": fs})
-    has = {e["date"]: e for e in tl}
-
-    def on_save(ch):
-        he, ae = {}, {}
-        for d, fs in ch.items():
-            for f, v in fs.items():  # 테마는 그날 있는 시트 모두에, 이슈는 제 칸에
-                if f in ("theme", "telegram") and has[d]["hist"]:
-                    he.setdefault((d, code), {})[f] = v
-                if f in ("theme", "reason") and has[d]["vol"]:
-                    ae.setdefault((d, code), {})[f] = v
-        return edit.save(amount_edits=ae, hist_edits=he)
-
-    edit.form(f"stk_form_{code}", [("날짜별 테마·이슈 · 최신순", items)], on_save)
-    st.stop()
 
 if card["interest"]:
     st.markdown("<div class='sec'>⭐ 관심종목 · 한줄평</div>", unsafe_allow_html=True)
     if card["comment"]:
         st.markdown(f"<div class='box'>📝 {html.escape(card['comment'])}</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div class='empty'>아직 한줄평이 없습니다. ✏️ 입력을 켜서 적어 보세요.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='empty'>아직 한줄평이 없습니다. ✏️ 수정을 켜서 적어 보세요.</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='sec'>테마</div>", unsafe_allow_html=True)
 if card["themes"]:

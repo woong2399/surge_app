@@ -225,13 +225,15 @@ def name_of(code):
 
 
 def stocks():
-    """일지(이력) 종목 + 거래대금상위 종목 + (그 둘에 없는) 관심종목."""
+    """일지(이력)·거래대금상위·관심종목 + DB 종목목록 전체."""
     names = {}
     for r in volume() + history():
         if r["name"]:
             names[r["code"]] = r["name"]
     for m in manual_stocks():
         names.setdefault(m["code"], m["name"])
+    for u in universe():  # DB 상장 종목 전체: 아직 한 번도 안 나온 종목도 골라서 관심종목에 넣을 수 있게
+        names.setdefault(u["code"], u["name"])
     return sorted(({"code": c, "name": n} for c, n in names.items()), key=lambda s: s["name"])
 
 

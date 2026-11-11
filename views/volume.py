@@ -53,28 +53,6 @@ ui.setup(f"{d.month}월 {d.day}일 {WD[d.weekday()]}요일",
          f"상위 {len(rows)}종목 · 합계 {ui.eok_text(total(rows))}")
 view = st.radio("보기", ["등락률순", "테마별"], horizontal=True, label_visibility="collapsed", key="vol_view")
 
-if st.toggle("✏️ 테마·이슈 입력", key="vol_edit"):
-    import edit
-    if not edit.unlocked():
-        st.stop()
-    edit.theme_box()
-    # 옵시디언 날짜 노트와 같은 순서: 전 거래일 상위 30에 없던 종목(신규 진입) 먼저, 등락률 없는 종목(신규 상장) 맨 위
-    all_rows = db.volume_day(day)
-    older = [x for x in dates if x < day]
-    prev_codes = {r["code"] for r in db.volume_day(older[0])} if older else set()
-    order = lambda r: (r["pct"] is not None, -(r["pct"] or 0))
-    new = sorted([r for r in all_rows if r["code"] not in prev_codes], key=order)
-    cont = sorted([r for r in all_rows if r["code"] in prev_codes], key=order)
-    def item(r):
-        pct = "신규" if r["pct"] is None else f"{r['pct']:+.2f}%"
-        return {"id": (day, r["code"]), "title": f"{r['name']} · {pct}",
-                "fields": [("theme", "테마", r["theme"], "theme"), ("reason", "이슈", r["reason"])]}
-    edit.form(f"vol_form_{day}",
-              [(f"신규 진입 · {len(new)}종목", [item(r) for r in new]),
-               (f"이어서 든 종목 · {len(cont)}종목", [item(r) for r in cont])],
-              lambda ch: edit.save(amount_edits=ch))
-    st.caption("같은 종목의 다른 날짜와 일지(이력)의 같은 날 빈 테마 칸도 같이 채워집니다. 옵시디언 노트에는 이 컴퓨터에서 동기화가 돌 때 들어갑니다.")
-    st.stop()
 if not rows:
     st.markdown("<div class='empty'>조건에 맞는 종목이 없습니다.</div>", unsafe_allow_html=True)
 

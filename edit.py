@@ -196,99 +196,10 @@ def save(amount_edits=None, hist_edits=None):
     return len(au) + len(hu)
 
 
-def rename_theme(old, new):
-    """두 시트(거래대금상위·일지 이력)의 모든 칸에서 테마 old 를 new 로 바꾼다. new 는 쉼표로 여러 개도 된다.
-    이미 같은 테마가 있는 칸은 겹치지 않게 한 번만 둔다. 쓴 칸 수를 돌려준다."""
-    to = db.split_themes(_clean(new))
-    if not to:
-        raise ValueError("새 테마 이름이 비었습니다")
-    n = 0
-    for sid, tab in ((db.AMOUNT_SHEET_ID, "거래대금상위"), (db.sheet_id(), "이력")):
-        ws, vals, h = _load(sid, tab)
-        upd = {}
-        for i, r in enumerate(vals[1:], start=2):
-            ts = db.split_themes(r[h["theme"]])
-            if old not in ts:
-                continue
-            out = []
-            for t in ts:
-                for x in (to if t == old else [t]):
-                    if x not in out:
-                        out.append(x)
-            v = ", ".join(out)
-            if v != r[h["theme"]].strip():
-                upd[(i, "theme")] = v
-        _write(ws, h, upd)
-        n += len(upd)
-    ws, vals, h = _manual()  # 관심종목의 테마도
-    if ws is not None:
-        upd = {}
-        for i, r in enumerate(vals[1:], start=2):
-            ts = db.split_themes(_cell(r, h, "theme"))
-            if old in ts:
-                out = []
-                for t in ts:
-                    for x in (to if t == old else [t]):
-                        if x not in out:
-                            out.append(x)
-                upd[(i, "theme")] = ", ".join(out)
-        _write(ws, h, upd)
-        n += len(upd)
-    _registry_replace(old, to)  # 테마목록도
-    st.cache_data.clear()
-    return n
-
-
-def form(key, sections, on_save):
-    """입력 칸 묶음. sections = [(제목, [{"id", "title", "fields": [(칸, 안내 글자, 지금 값[, "theme"])]}])].
-    네 번째 값이 "theme" 인 칸은 테마목록에서 고르는 선택 목록(스크롤·검색, 여러 개)이고, 나머지는 글자 칸이다.
-    저장을 누르면 바뀐 칸만 on_save({id: {칸: 새 값}}) 로 넘기고, 돌려받은 쓴 칸 수를 보여 준다."""
+def banner(text):
+    """수정 중임을 눈에 띄게 알리는 띠."""
     import html
-    all_themes = db.all_themes()
-    with st.form(key):
-        for title, items in sections:
-            if not items:
-                continue
-            if title:
-                st.markdown(f"<div class='sec'>{html.escape(title)}</div>", unsafe_allow_html=True)
-            for it in items:
-                st.markdown(f"<div class='ft'>{html.escape(it['title'])}</div>", unsafe_allow_html=True)
-                fs = it["fields"]
-                cols = st.columns([1] + [1.4] * (len(fs) - 1)) if len(fs) > 1 else [st]
-                for col, fld in zip(cols, fs):
-                    f, ph, v = fld[:3]
-                    k = f"{key}|{it['id']}|{f}"
-                    if len(fld) > 3 and fld[3] == "theme":
-                        cur = db.split_themes(v)  # 목록에 없는 옛 테마도 보이게 한다(잃어버리지 않게)
-                        col.multiselect(ph, sorted(set(all_themes) | set(cur)), default=cur, key=k,
-                                        placeholder="테마 선택", label_visibility="collapsed")
-                    else:
-                        col.text_input(ph, value=v or "", key=k, placeholder=ph, label_visibility="collapsed")
-        if not st.form_submit_button("저장", type="primary", use_container_width=True):
-            return
-    ch = {}
-    for _, items in sections:
-        for it in items:
-            for fld in it["fields"]:
-                f, _ph, v = fld[:3]
-                raw = st.session_state.get(f"{key}|{it['id']}|{f}")
-                if len(fld) > 3 and fld[3] == "theme":
-                    cur = db.split_themes(v)
-                    new = list(raw) if raw is not None else cur
-                    if set(new) != set(cur):  # 순서만 다른 건 바뀐 게 아니다
-                        ch.setdefault(it["id"], {})[f] = ", ".join(new)
-                else:
-                    new = raw if raw is not None else (v or "")
-                    if " ".join(new.split()) != " ".join((v or "").split()):
-                        ch.setdefault(it["id"], {})[f] = new
-    if not ch:
-        st.info("바뀐 칸이 없습니다.")
-        return
-    try:
-        n = on_save(ch)
-        st.success(f"저장했습니다 · 바뀐 칸 {n}개" if n else "바뀐 칸이 없습니다.")
-    except Exception as e:
-        st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
+    st.markdown(f"<div class='editbar'>✏️ <b>수정 중</b> · {html.escape(text)}</div>", unsafe_allow_html=True)
 
 
 MANUAL_TAB = "관심종목"  # code, name, theme, comment(한줄평), added — 사용자가 고른 관심종목. 다른 스크립트는 이 탭을 쓰지 않는다.
@@ -419,27 +330,7 @@ def remove_manual(code):
     return False
 
 
-def remove_theme(codes, theme):
-    """관심종목 줄들에서 테마 하나만 뺀다(종목은 관심종목에 남는다). 바뀐 줄 수를 돌려준다."""
-    ws, vals, h = _manual()
-    upd = {}
-    for i, r in enumerate(vals[1:], start=2):
-        if _cell(r, h, "code") in codes:
-            cur = db.split_themes(_cell(r, h, "theme"))
-            if theme in cur:
-                upd[(i, "theme")] = ", ".join(t for t in cur if t != theme)
-    _write(ws, h, upd)
-    if upd:
-        st.cache_data.clear()
-    return len(upd)
-
-
 # ── 테마 목록(고유값) ─────────────────────────────────────────────────────────────
-
-def _theme_key(t):
-    """같은 이름인지 볼 때 쓰는 값: 공백을 없애고 소문자로."""
-    import re
-    return re.sub(r"\s+", "", t or "").casefold()
 
 
 def add_theme(name):
@@ -462,96 +353,154 @@ def add_theme(name):
     return name
 
 
-def _uses(theme):
-    """그 테마를 쓰는 칸 수(일지 이력·거래대금상위·관심종목)."""
-    n = 0
-    for rows in (db.history(), db.volume(), db.manual_stocks()):
-        n += sum(1 for r in rows if theme in db.split_themes(r["theme"]))
-    return n
+# ── 종목 화면 수정: 테마(이미 있는 테마로 연결·오타 확인)·거래대금 이유·한줄평·관심종목 ───────────────────
+# 모두 '쓰고 Enter' 로 바로 저장된다(저장 버튼 없음). 콜백(on_*)은 위젯의 on_change 로 건다.
+
+def _norm(t):
+    """테마 이름 비교값: 글자·숫자만 남기고 소문자로. 공백·괄호·가운뎃점만 다른 이름은 같은 테마로 본다."""
+    import re
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", t or "").casefold()
 
 
-def delete_theme(theme):
-    """테마목록에서 테마를 지운다. 쓰는 칸이 하나라도 있으면 ValueError(먼저 다른 테마로 바꾸거나 빼야 한다)."""
-    n = _uses(theme)
-    if n:
-        raise ValueError(f"{n}개 칸에서 쓰고 있어서 지울 수 없습니다.")
-    ws, vals, h = _tab(THEME_TAB, THEME_HEAD)
-    if ws is None:
-        return 0
-    gone = 0
-    for i in range(len(vals) - 1, 0, -1):  # 아래에서부터 지워야 줄 번호가 안 밀린다
-        if vals[i] and vals[i][0].strip() == theme:
-            ws.delete_rows(i + 1)
-            gone += 1
-    if gone:
-        st.cache_data.clear()
-    return gone
+_theme_key = _norm
 
 
-def _registry_replace(old, to):
-    """이름을 바꿀 때 테마목록도 맞춘다: old 줄을 지우고, to 의 이름 중 목록에 없는 것을 더한다."""
-    ws, vals, h = _tab(THEME_TAB, THEME_HEAD, create=True)
-    have = {_theme_key(r[0]) for r in vals[1:] if r and r[0].strip() and r[0].strip() != old}
-    for i in range(len(vals) - 1, 0, -1):
-        if vals[i] and vals[i][0].strip() == old:
-            ws.delete_rows(i + 1)
-    add = [[t, _today()] for t in to if _theme_key(t) not in have]
-    if add:
-        ws.append_rows(add, value_input_option="RAW")
+def _lev(a, b):
+    """두 글자열의 편집 거리(글자 하나 바꾸기·넣기·빼기 횟수)."""
+    prev = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        cur = [i]
+        for j, y in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y)))
+        prev = cur
+    return prev[-1]
 
 
-def theme_box(key="new_theme"):
-    """'➕ 새 테마' 입력 칸. 이름을 쓰고 Enter 를 누르면 바로 테마목록에 들어가고, 선택 목록에 바로 나온다."""
-    def done():
-        name = st.session_state.get(key, "")
-        if not name.strip():
-            return
-        try:
-            st.toast(f"테마를 추가했습니다: {add_theme(name)}", icon="✅")
-            st.session_state[key] = ""
-        except ValueError as e:
-            st.toast(str(e), icon="⚠️")
-        except Exception as e:
-            st.toast(f"추가하지 못했습니다: {type(e).__name__}: {str(e)[:100]}", icon="⚠️")
+def theme_resolve(text):
+    """입력한 테마 글을 이미 있는 테마와 맞춘다. 쉼표로 나눠 하나씩:
+      · 이미 있는 테마(공백·괄호·대소문자만 달라도) → 그 이름 (문자열)
+      · 비슷한 테마가 있음(오타 같음: 반도채→반도체, 앞부분만 쓴 반도→반도체…) → ("?", 입력, [후보…]) 로 물어봐야 함
+      · 없는 이름 → 새 테마 (문자열, 저장할 때 테마목록에 등록)"""
+    by = {}
+    for t in db.all_themes():
+        by.setdefault(_norm(t), t)
+    out = []
+    for t in db.split_themes(_clean(text)):
+        k = _norm(t)
+        if not k:
+            continue
+        if k in by:
+            out.append(by[k])
+            continue
+        lim = 1 if len(k) <= 4 else 2
+        cands = [n for kk, n in by.items() if abs(len(kk) - len(k)) <= lim and _lev(k, kk) <= lim]
+        cands += [n for kk, n in by.items() if len(k) >= 2 and kk.startswith(k) and n not in cands]
+        out.append(("?", t, cands[:3]) if cands else t)
+    return out
 
-    st.text_input("➕ 새 테마 (이름을 쓰고 Enter)", key=key, on_change=done, placeholder="새 테마 이름")
+
+def _commit_names(items):
+    """정해진 이름들(문자열)을 돌려준다. 테마목록에 없는 새 이름은 여기서 등록한다."""
+    known = {_norm(t) for t in db.all_themes()}
+    names = []
+    for t in items:
+        if _norm(t) not in known:
+            add_theme(t)
+            known.add(_norm(t))
+        if t not in names:
+            names.append(t)
+    return names
 
 
-def pick_stock(key, theme="", label="➕ 종목 추가"):
-    """DB 종목목록에서 이름·코드를 검색해 고르면 바로 관심종목에 넣는다(theme 이 있으면 그 테마도 붙인다). 추가 버튼은 없다."""
-    uni = {u["code"]: u for u in db.universe()}
-    if not uni:
-        st.info("종목 목록(amount 시트 종목목록 탭)을 읽지 못했습니다. 컴퓨터에서 lists_sync.py 가 한 번 돌아야 합니다.")
+def save_day_theme(date, code, text):
+    """그날 그 종목의 테마를, 그 줄이 있는 시트(거래대금상위·일지 이력)마다 쓴다. 쓴 칸 수를 돌려준다."""
+    ae = {(date, code): {"theme": text}} if any(r["date"] == date and r["code"] == code for r in db.volume()) else {}
+    he = {(date, code): {"theme": text}} if any(r["date"] == date and r["code"] == code for r in db.history()) else {}
+    return save(amount_edits=ae, hist_edits=he)
+
+
+def _apply_theme(kind, args, key, items):
+    try:
+        text = ", ".join(_commit_names(items))
+        if kind == "day":
+            save_day_theme(args[0], args[1], text)
+        else:
+            save_manual(args[0], theme=text)
+        st.session_state[key] = text  # 칸에는 연결된(고쳐진) 이름을 보여 준다
+        st.toast("저장했습니다", icon="✅")
+    except Exception as e:
+        st.toast(f"저장하지 못했습니다: {str(e)[:100]}", icon="⚠️")
+
+
+def on_theme(kind, args, key):
+    """테마 칸에서 Enter. kind: 'day'(날짜별, args=(날짜, 코드)) 또는 'manual'(관심종목, args=(코드,))."""
+    items = theme_resolve(st.session_state.get(key, ""))
+    if any(isinstance(i, tuple) for i in items):  # 오타 같은 게 있으면 저장하지 않고 먼저 물어본다
+        st.session_state["theme_pending"] = {"kind": kind, "args": args, "key": key, "items": items}
         return
-    have = {m["code"] for m in db.manual_stocks() if not theme or theme in db.split_themes(m["theme"])}
-
-    def done():
-        code = st.session_state.get(key)
-        if not code:
-            return
-        try:
-            add_to_interest([code], theme)
-            st.toast(f"{uni[code]['name']} 추가했습니다" + (f" → {theme}" if theme else " → 관심종목"), icon="✅")
-        except Exception as e:
-            st.toast(f"추가하지 못했습니다: {str(e)[:100]}", icon="⚠️")
-        st.session_state[key] = None  # 다음 종목을 바로 고를 수 있게 비운다
-
-    st.selectbox(label, [c for c in uni if c not in have], index=None, key=key, on_change=done,
-                 format_func=lambda c: f"{uni[c]['name']}  {c}  {uni[c]['market']}",
-                 placeholder="이름이나 코드로 검색해서 고르면 바로 추가됩니다")
+    _apply_theme(kind, args, key, items)
 
 
-def save_memo(code, memo):
-    """amount 종목 탭에서 code 줄의 memo 칸을 바꾼다. 줄이 없으면 False."""
-    ws = _ws("종목")
-    vals = ws.get_all_values()
-    h = {n: i for i, n in enumerate(vals[0])}
-    for i, r in enumerate(vals[1:], start=2):
-        if r[h["code"]] == code:
-            ws.update_cell(i, h["memo"] + 1, memo.strip())
-            st.cache_data.clear()
-            return True
-    return False
+def _ask_pick(i, name):
+    p = st.session_state.get("theme_pending")
+    if not p:
+        return
+    p["items"][i] = name
+    if not any(isinstance(it, tuple) for it in p["items"]):
+        st.session_state.pop("theme_pending")
+        _apply_theme(p["kind"], p["args"], p["key"], p["items"])
+
+
+def _ask_cancel():
+    st.session_state.pop("theme_pending", None)
+
+
+def theme_ask_ui():
+    """오타 같은 테마가 있으면 '혹시 ○○?' 하고 묻는다. 고르면 이어서 저장한다."""
+    import html
+    p = st.session_state.get("theme_pending")
+    if not p:
+        return
+    i = next(n for n, it in enumerate(p["items"]) if isinstance(it, tuple))
+    _, typed, cands = p["items"][i]
+    st.markdown(f"<div class='editbar'>‘{html.escape(typed)}’ 는 목록에 없는 테마예요. 혹시 "
+                f"<b>{html.escape(' / '.join(cands))}</b> 인가요?</div>", unsafe_allow_html=True)
+    cols = st.columns(len(cands) + 2)
+    for c, cand in zip(cols, cands):
+        c.button(cand, key=f"ta_{i}_{cand}", on_click=_ask_pick, args=(i, cand))
+    cols[-2].button(f"새 테마 ‘{typed}’", key=f"ta_new_{i}", on_click=_ask_pick, args=(i, typed))
+    cols[-1].button("취소", key=f"ta_cancel_{i}", on_click=_ask_cancel)
+
+
+def on_reason(date, code, key):
+    """거래대금 이유 칸에서 Enter."""
+    try:
+        save(amount_edits={(date, code): {"reason": st.session_state.get(key, "")}})
+        st.toast("저장했습니다", icon="✅")
+    except Exception as e:
+        st.toast(f"저장하지 못했습니다: {str(e)[:100]}", icon="⚠️")
+
+
+def on_comment(code, key):
+    """관심종목 한줄평 칸에서 Enter."""
+    try:
+        save_manual(code, comment=st.session_state.get(key, ""))
+        st.toast("저장했습니다", icon="✅")
+    except Exception as e:
+        st.toast(f"저장하지 못했습니다: {str(e)[:100]}", icon="⚠️")
+
+
+def on_interest(code, key):
+    """'⭐ 관심종목' 체크: 켜면 넣고, 끄면 뺀다(한줄평·관심 테마도 함께 지워진다)."""
+    try:
+        if st.session_state.get(key):
+            add_to_interest([code])
+            st.toast("관심종목에 넣었습니다", icon="⭐")
+        else:
+            remove_manual(code)
+            st.toast("관심종목에서 뺐습니다", icon="✅")
+    except Exception as e:
+        st.toast(f"처리하지 못했습니다: {str(e)[:100]}", icon="⚠️")
 
 
 def read_values(tab):

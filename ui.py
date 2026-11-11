@@ -18,12 +18,15 @@ CSS = """<style>
 .block-container{padding:3.2rem .75rem 3rem;max-width:760px}
 header[data-testid="stHeader"]{background:transparent}
 [data-testid="stElementContainer"]:has(input[aria-label="edit_tok_bridge"]){display:none}  /* 로그인 기억용 숨은 칸 */
+.editbar{background:rgba(229,160,40,.16);border-left:4px solid #e5a028;border-radius:6px;padding:7px 11px;font-size:13px;margin:2px 0 4px}
 /* 한 화면에 많이 보이게: 글씨·간격을 작게 (사용자 요청 2026-11-11) */
 .stApp [data-testid="stVerticalBlock"]{gap:.45rem}
 .stApp [data-testid="stMarkdownContainer"] p,.stApp label,.stApp input,.stApp textarea,.stApp [data-baseweb="select"] *{font-size:13px}
 .stApp [data-testid="stTextInput"] input{padding:5px 9px}
 .stApp [data-baseweb="select"] > div{min-height:34px}
-.stApp [data-testid="stFormSubmitButton"] button,.stApp .stButton button{min-height:34px;padding:2px 12px}
+.stApp [data-testid="stFormSubmitButton"] button,.stApp .stButton button{min-height:26px;padding:0 10px;font-size:12px;line-height:1.2}
+.stApp .stButton button p,.stApp [data-testid="stFormSubmitButton"] button p{font-size:12px}
+.stApp [data-testid="stCheckbox"] label,.stApp [data-testid="stToggle"] label{min-height:0}
 .hd{margin:0 0 .3rem}
 .hd .t{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin:0}
 .hd .s{color:var(--mute);font-size:12px;margin-top:1px}
