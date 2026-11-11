@@ -26,7 +26,7 @@ header[data-testid="stHeader"]{background:transparent}
 .hd{margin:0 0 .3rem}
 .hd .t{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin:0}
 .hd .s{color:var(--mute);font-size:12px;margin-top:1px}
-.c{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0 0 14px;background:var(--soft)}
+.c{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0 0 5px;background:var(--soft)}
 .c-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .c-name a.sl{color:inherit;text-decoration:none}
 .c-name a.sl::after{content:'';position:absolute;inset:0;border-radius:10px}
@@ -37,7 +37,7 @@ header[data-testid="stHeader"]{background:transparent}
 .pct{flex:none;font-size:12.5px;font-weight:800;color:var(--up);background:var(--up-bg);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
 .c-meta{margin-top:1px;font-size:11.5px;line-height:1.45;color:var(--mute);white-space:pre-line}
 .pct.dn{color:#2f6fe0;background:rgba(47,111,224,.13)}
-.grp{margin:20px 0 9px;padding:5px 10px;border-radius:8px;background:var(--chip-bg);display:flex;align-items:baseline;gap:8px}
+.grp{margin:12px 0 2px;padding:5px 10px;border-radius:8px;background:var(--chip-bg);display:flex;align-items:baseline;gap:8px}
 .grp .gt{font-size:14px;font-weight:800;color:var(--chip-fg)}
 .grp .gs{font-size:11.5px;color:var(--mute)}
 .chips{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px}
@@ -53,12 +53,13 @@ header[data-testid="stHeader"]{background:transparent}
 .c-news a{color:var(--chip-fg)}
 .c-news a::before, .c-news span::before{content:"뉴스";font-size:9.5px;font-weight:700;color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:0 3px;margin-right:5px}
 .dh{margin:14px 0 5px;font-size:13px;font-weight:700;color:var(--mute)}
-.box{border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin:3px 0 8px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;background:var(--soft)}
-.sec{margin:12px 0 3px;font-size:11.5px;font-weight:700;color:var(--mute);letter-spacing:.02em}
+.box{border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin:0;font-size:12.5px;line-height:1.5;white-space:pre-wrap;background:var(--soft)}
+.sec{margin:10px 0 -1px;font-size:11.5px;font-weight:700;color:var(--mute);letter-spacing:.02em}
 .sum{font-size:12px;margin:0 0 6px}
 .ft{font-size:12.5px;font-weight:650;line-height:1.4;margin:6px 0 0}
-.stApp [data-testid="stMarkdownContainer"]:has(> .ft){margin-bottom:0}
-.empty{color:var(--mute);font-size:12.5px;margin:2px 0 6px}
+/* Streamlit 은 글 블록 아래에 음수 여백(-1rem)을 넣어, 우리가 만든 칸들이 서로 겹친다 → 없앤다 */
+.stApp [data-testid="stMarkdownContainer"]:has(> :is(.hd,.sec,.chips,.trow,.empty,.box,.c,.grp,.ft,.sum)){margin-bottom:0}
+.empty{color:var(--mute);font-size:12.5px;margin:0}
 section[data-testid="stSidebar"] label{font-size:13px}
 </style>"""
 
