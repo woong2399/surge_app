@@ -17,6 +17,7 @@ CSS = """<style>
 @media (prefers-color-scheme: dark){ :root{ --up:#ff6b5e; --up-bg:rgba(255,107,94,.16); --chip-fg:#8db4ff; --chip-bg:rgba(110,160,255,.18); } }
 .block-container{padding:3.2rem .75rem 3rem;max-width:760px}
 header[data-testid="stHeader"]{background:transparent}
+[data-testid="stElementContainer"]:has(input[aria-label="edit_tok_bridge"]){display:none}  /* 로그인 기억용 숨은 칸 */
 /* 한 화면에 많이 보이게: 글씨·간격을 작게 (사용자 요청 2026-11-11) */
 .stApp [data-testid="stVerticalBlock"]{gap:.45rem}
 .stApp [data-testid="stMarkdownContainer"] p,.stApp label,.stApp input,.stApp textarea,.stApp [data-baseweb="select"] *{font-size:13px}

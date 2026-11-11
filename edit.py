@@ -57,37 +57,53 @@ def _tok():
     return hmac.new(str(_secret("EDIT_PASSWORD")).encode(), b"surge-edit-v1", hashlib.sha256).hexdigest()
 
 
-def _cookie_ok():
-    """이 기기에 30일짜리 로그인 기억(쿠키)이 있고 맞으면 True."""
-    import hmac
-    try:
-        c = st.context.cookies.get("edit_tok")
-    except Exception:
-        return False
-    return bool(c) and hmac.compare_digest(str(c), _tok())
+_BRIDGE_JS = """<script>
+// 로그인 기억: 이 기기(브라우저)의 localStorage 에 확인값을 두고, 새 화면이 열리면 숨은 입력 칸으로 서버에 보낸다.
+// (Streamlit Cloud 는 쿠키를 앱에 전달하지 않아서 localStorage 를 쓴다. 주소에는 아무것도 남기지 않는다.)
+const KEY = 'surge_edit_tok';
+const SAVE = %s;
+try {
+  if (SAVE) { localStorage.setItem(KEY, SAVE); }
+  const saved = localStorage.getItem(KEY);
+  const doc = window.parent.document;
+  const send = () => {
+    const inp = doc.querySelector('input[aria-label="edit_tok_bridge"]');
+    if (!inp || !saved || inp.value === saved) return !!inp;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, saved);
+    inp.dispatchEvent(new Event('input', {bubbles: true}));
+    inp.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true}));
+    inp.blur();
+    return true;
+  };
+  if (!SAVE && saved) { let n = 0; const t = setInterval(() => { if (send() || ++n > 20) clearInterval(t); }, 250); }
+} catch (e) {}
+</script>"""
 
 
 def unlocked():
     """비밀번호를 맞게 넣었으면 True. 아니면 입력 칸을 보여 주고 False.
-    한 번 맞게 넣으면 이 기기에 30일 기억해서(쿠키) 카드를 눌러 화면이 새로 열려도 다시 묻지 않는다."""
+    한 번 맞게 넣으면 이 기기가 기억해서(localStorage), 화면이 새로 열리거나 폰이 다시 연결돼도 다시 묻지 않는다.
+    비밀번호(EDIT_PASSWORD)를 바꾸면 기억된 값은 저절로 못 쓰게 된다."""
+    import hmac
+    import streamlit.components.v1 as components
     if not available():
         st.info("입력 기능이 아직 켜지지 않았습니다. 앱 Secrets 에 서비스 계정 키와 EDIT_PASSWORD 를 넣어야 합니다.")
         return False
-    if st.session_state.get("edit_ok") or _cookie_ok():
+    got = st.session_state.get("edit_tok_bridge", "")
+    if st.session_state.get("edit_ok") or (got and hmac.compare_digest(got, _tok())):
         st.session_state["edit_ok"] = True
-        if st.session_state.pop("edit_set_cookie", False):  # 방금 로그인했으면 이 기기에 기억을 남긴다
-            import streamlit.components.v1 as components
-            components.html(
-                f"<script>document.cookie='edit_tok={_tok()}; max-age=2592000; path=/; SameSite=Lax'"
-                "+(location.protocol==='https:'?'; Secure':'')</script>", height=0)
+        if st.session_state.pop("edit_remember", False):  # 방금 로그인했으면 이 기기에 기억을 남긴다
+            components.html(_BRIDGE_JS % repr(_tok()), height=0)
         return True
-    pw = st.text_input("비밀번호 (한 번 넣으면 이 기기에 30일 기억됩니다)", type="password", key="edit_pw")
-    if st.query_params.get("dbg"):  # 로그인 기억이 서버에 오는지 확인용
-        st.caption(f"쿠키 이름: {list(st.context.cookies.keys())}")
+    pw = st.text_input("비밀번호 (한 번 넣으면 이 기기가 기억합니다)", type="password", key="edit_pw")
+    st.text_input("edit_tok_bridge", key="edit_tok_bridge", label_visibility="collapsed")  # 숨은 칸: 기억된 값이 들어온다
+    components.html(_BRIDGE_JS % "''", height=0)
+    if st.query_params.get("dbg"):
+        st.caption(f"기기 기억 수신: {'있음' if got else '없음'}")
     if pw:
         if pw == str(_secret("EDIT_PASSWORD")):
             st.session_state["edit_ok"] = True
-            st.session_state["edit_set_cookie"] = True
+            st.session_state["edit_remember"] = True
             st.rerun()
         st.error("비밀번호가 맞지 않습니다.")
     return False
