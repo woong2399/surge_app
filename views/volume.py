@@ -57,6 +57,7 @@ if st.toggle("✏️ 테마·이슈 입력", key="vol_edit"):
     import edit
     if not edit.unlocked():
         st.stop()
+    edit.theme_box()
     # 옵시디언 날짜 노트와 같은 순서: 전 거래일 상위 30에 없던 종목(신규 진입) 먼저, 등락률 없는 종목(신규 상장) 맨 위
     all_rows = db.volume_day(day)
     older = [x for x in dates if x < day]
@@ -67,7 +68,7 @@ if st.toggle("✏️ 테마·이슈 입력", key="vol_edit"):
     def item(r):
         pct = "신규" if r["pct"] is None else f"{r['pct']:+.2f}%"
         return {"id": (day, r["code"]), "title": f"{r['name']} · {pct}",
-                "fields": [("theme", "테마 (쉼표로 여러 개)", r["theme"]), ("reason", "이슈", r["reason"])]}
+                "fields": [("theme", "테마", r["theme"], "theme"), ("reason", "이슈", r["reason"])]}
     edit.form(f"vol_form_{day}",
               [(f"신규 진입 · {len(new)}종목", [item(r) for r in new]),
                (f"이어서 든 종목 · {len(cont)}종목", [item(r) for r in cont])],

@@ -19,8 +19,8 @@ if not stocks:
     st.stop()
 
 def lab(s):
-    """목록 글자: '이름  코드'. 코드 없이 관심종목에만 있는 종목은 코드 자리에 ⭐."""
-    return f"{s['name']}  {'⭐' if s['code'].startswith('@') else s['code']}"
+    """목록 글자: '이름  코드'."""
+    return f"{s['name']}  {s['code']}"
 
 
 # 이슈·테마 화면의 카드를 누르면(?code=코드) 그 종목이 골라진 채로 열린다.
@@ -44,8 +44,8 @@ if not choice:
 
 code, name = labels[choice]["code"], labels[choice]["name"]
 card = db.stock_card(code)
-ui.setup(name, "직접 추가한 종목 · 일지·거래대금에 나온 적 없음" if code.startswith("@") else code)
 tl = db.stock_timeline(code)
+ui.setup(name, code if tl else f"{code} · 아직 일지·거래대금에 나온 적 없음")
 WD = "월화수목금토일"
 
 
@@ -72,16 +72,23 @@ if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
     import edit
     if not edit.unlocked():
         st.stop()
-    mine = next((m for m in db.manual_stocks() if m["name"] == name), None)
+    edit.theme_box()
+    mine = next((m for m in db.manual_stocks() if m["code"] == code), None)
     if mine:  # 관심종목: 테마와 한줄평
-        edit.form(f"mine_form_{name}", [("⭐ 관심종목 · 테마와 한줄평", [
-            {"id": name, "title": name, "fields": [("theme", "테마 (쉼표로 여러 개)", mine["theme"]),
+        edit.form(f"mine_form_{code}", [("⭐ 관심종목 · 테마와 한줄평", [
+            {"id": code, "title": name, "fields": [("theme", "테마", mine["theme"], "theme"),
                                                   ("comment", "📝 한줄평", mine["comment"])]}])],
-            lambda ch: sum(bool(edit.save_manual(n, **f)) for n, f in ch.items()))
+            lambda ch: sum(bool(edit.save_manual(c, **f)) for c, f in ch.items()))
     elif st.button("⭐ 관심종목에 추가", key=f"fav_{code}", use_container_width=True):
-        edit.add_to_interest([name])
-        st.rerun()
-    if code.startswith("@"):  # 일지·거래대금에 나온 적 없는 종목은 날짜별 기록이 없다
+        try:
+            edit.add_to_interest([code])
+            st.rerun()
+        except Exception as e:
+            if type(e).__name__ not in ("RerunException", "StopException"):
+                st.error(f"추가하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
+            else:
+                raise
+    if not tl:  # 일지·거래대금에 나온 적 없는 종목은 날짜별 기록이 없다
         st.stop()
     if code in db.amount_notes():
         with st.form(f"memo_form_{code}"):
@@ -94,7 +101,7 @@ if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
                     st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
     items = []
     for e in tl:
-        fs = [("theme", "테마 (쉼표로 여러 개)", ", ".join(themes_of(e)))]
+        fs = [("theme", "테마", ", ".join(themes_of(e)), "theme")]
         if e["hist"]:
             fs.append(("telegram", "💬 일지 이슈", e["hist"]["telegram"]))
         if e["vol"]:

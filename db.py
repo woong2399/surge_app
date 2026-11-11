@@ -164,40 +164,58 @@ def day_rows(day):
 
 
 @st.cache_data(ttl=TTL, show_spinner=False)
-def manual_stocks():
-    """amount 시트 관심종목 탭 → [{name, theme, comment}] (사용자가 종목명만으로 직접 넣은 종목, 최근 추가가 앞).
+def universe():
+    """amount 시트 종목목록 탭(lists_sync.py 가 DB stocks 에서 내보낸 상장 종목) → [{code, name, market}].
     탭이 없거나 읽을 수 없으면 []."""
     import edit
-    vals = edit.read_values("관심종목")
-    if not vals or not {"name", "theme", "comment"} <= set(vals[0]):  # 탭이 없을 때 엉뚱한 시트를 읽지 않게 제목도 확인
+    vals = edit.read_values("종목목록")
+    if not vals or not {"code", "name", "market"} <= set(vals[0]):
         return []
     h = {n: i for i, n in enumerate(vals[0])}
     out = []
     for r in vals[1:]:
         g = lambda f: r[h[f]].strip() if h[f] < len(r) else ""
-        if g("name"):
-            out.append({"name": g("name"), "theme": g("theme"), "comment": g("comment")})
-    return out[::-1]
-
-
-def known_codes():
-    """일지·거래대금에 나온 종목 이름 → 코드."""
-    out = {}
-    for r in volume() + history():
-        if r["name"]:
-            out[r["name"]] = r["code"]
+        if g("code"):
+            out.append({"code": g("code"), "name": g("name"), "market": g("market")})
     return out
 
 
-def manual_code(name):
-    """관심종목의 종목 코드. 일지·거래대금에 나온 적이 있으면 그 코드, 없으면 '@이름'."""
-    return known_codes().get(name) or "@" + name
+def universe_names():
+    return {u["code"]: u["name"] for u in universe()}
+
+
+@st.cache_data(ttl=TTL, show_spinner=False)
+def theme_registry():
+    """amount 시트 테마목록 탭 → 테마 이름 목록(고유값). 탭이 없으면 []."""
+    import edit
+    vals = edit.read_values("테마목록")
+    if not vals or "theme" not in vals[0]:
+        return []
+    i = vals[0].index("theme")
+    return [r[i].strip() for r in vals[1:] if i < len(r) and r[i].strip()]
+
+
+@st.cache_data(ttl=TTL, show_spinner=False)
+def manual_stocks():
+    """amount 시트 관심종목 탭 → [{code, name, theme, comment}] (최근에 넣은 것이 앞). 탭이 없거나 읽을 수 없으면 []."""
+    import edit
+    vals = edit.read_values("관심종목")
+    if not vals or not {"code", "name", "theme", "comment"} <= set(vals[0]):  # 탭이 없을 때 엉뚱한 시트를 읽지 않게 제목도 확인
+        return []
+    h = {n: i for i, n in enumerate(vals[0])}
+    names = universe_names()
+    out = []
+    for r in vals[1:]:
+        g = lambda f: r[h[f]].strip() if h[f] < len(r) else ""
+        if g("code"):
+            out.append({"code": g("code"), "name": names.get(g("code")) or g("name"), "theme": g("theme"),
+                        "comment": g("comment")})
+    return out[::-1]
 
 
 def name_of(code):
-    if code.startswith("@"):
-        return code[1:]
-    return next((r["name"] for r in history() + volume() if r["code"] == code and r["name"]), "")
+    return (next((r["name"] for r in history() + volume() if r["code"] == code and r["name"]), "")
+            or universe_names().get(code, ""))
 
 
 def stocks():
@@ -206,10 +224,8 @@ def stocks():
     for r in volume() + history():
         if r["name"]:
             names[r["code"]] = r["name"]
-    known = set(names.values())
     for m in manual_stocks():
-        if m["name"] not in known:
-            names["@" + m["name"]] = m["name"]
+        names.setdefault(m["code"], m["name"])
     return sorted(({"code": c, "name": n} for c, n in names.items()), key=lambda s: s["name"])
 
 
@@ -220,7 +236,7 @@ def stock_card(code):
         for t in split_themes(r["theme"]):
             if t not in themes:
                 themes.append(t)
-    mine = next((m for m in manual_stocks() if m["name"] == name_of(code)), None)
+    mine = next((m for m in manual_stocks() if m["code"] == code), None)
     for t in split_themes(mine["theme"] if mine else ""):
         if t not in themes:
             themes.append(t)
@@ -248,12 +264,13 @@ def stock_timeline(code):
 
 
 def all_themes():
-    """일지 이력·거래대금상위·관심종목에 적힌 테마 전부."""
+    """일지 이력·거래대금상위·관심종목에 적힌 테마 + 테마목록(고유값)."""
     seen = set()
     for r in history() + volume():
         seen.update(split_themes(r["theme"]))
     for m in manual_stocks():
         seen.update(split_themes(m["theme"]))
+    seen.update(theme_registry())
     return sorted(seen)
 
 
@@ -268,6 +285,6 @@ def theme_events(theme):
     rows = [r for r in history() + volume() if theme in split_themes(r["theme"])]
     for m in manual_stocks():
         if theme in split_themes(m["theme"]):
-            rows.append({"date": "", "code": manual_code(m["name"]), "name": m["name"], "pct": None,
+            rows.append({"date": "", "code": m["code"], "name": m["name"], "pct": None,
                          "grp": "surge", "manual": True})
     return sorted(rows, key=lambda r: (r["date"], r["pct"] or 0), reverse=True)

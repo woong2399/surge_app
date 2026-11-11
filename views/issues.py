@@ -31,9 +31,10 @@ ui.setup(f"{d.month}월 {d.day}일 {WD[d.weekday()]}요일", f"{len(rows)}종목
 if st.toggle("✏️ 테마·이슈 입력", key="iss_edit"):
     import edit
     if edit.unlocked():
+        edit.theme_box()
         edit.form(f"iss_form_{day}", [("", [
             {"id": (day, r["code"]), "title": f"{r['name']} · {r['pct']:+.2f}%",
-             "fields": [("theme", "테마 (쉼표로 여러 개)", r["theme"]), ("telegram", "이슈", r["telegram"])]}
+             "fields": [("theme", "테마", r["theme"], "theme"), ("telegram", "이슈", r["telegram"])]}
             for r in rows])], lambda ch: edit.save(hist_edits=ch))
         st.caption("같은 날 거래대금 상위에 같은 종목이 있고 그쪽 테마가 비어 있으면 같이 채워집니다.")
     st.stop()
