@@ -200,6 +200,12 @@ def manual_stocks():
     """amount 시트 관심종목 탭 → [{code, name, theme, comment}] (최근에 넣은 것이 앞). 탭이 없거나 읽을 수 없으면 []."""
     import edit
     vals = edit.read_values("관심종목")
+    if vals and "name" in vals[0] and "code" not in vals[0] and edit.available():  # 예전 형식 탭이면 새 형식으로 옮긴다
+        try:
+            edit._manual()
+            vals = edit.read_values("관심종목")
+        except Exception:
+            return []
     if not vals or not {"code", "name", "theme", "comment"} <= set(vals[0]):  # 탭이 없을 때 엉뚱한 시트를 읽지 않게 제목도 확인
         return []
     h = {n: i for i, n in enumerate(vals[0])}

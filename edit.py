@@ -50,17 +50,44 @@ def available():
         return False
 
 
+def _tok():
+    """비밀번호에서 만든 확인값(비밀번호 자체가 아니다). 비밀번호를 바꾸면 예전 확인값은 저절로 못 쓰게 된다."""
+    import hashlib
+    import hmac
+    return hmac.new(str(_secret("EDIT_PASSWORD")).encode(), b"surge-edit-v1", hashlib.sha256).hexdigest()
+
+
+def _cookie_ok():
+    """이 기기에 30일짜리 로그인 기억(쿠키)이 있고 맞으면 True."""
+    import hmac
+    try:
+        c = st.context.cookies.get("edit_tok")
+    except Exception:
+        return False
+    return bool(c) and hmac.compare_digest(str(c), _tok())
+
+
 def unlocked():
-    """비밀번호를 맞게 넣었으면 True. 아니면 입력 칸을 보여 주고 False."""
+    """비밀번호를 맞게 넣었으면 True. 아니면 입력 칸을 보여 주고 False.
+    한 번 맞게 넣으면 이 기기에 30일 기억해서(쿠키) 카드를 눌러 화면이 새로 열려도 다시 묻지 않는다."""
     if not available():
         st.info("입력 기능이 아직 켜지지 않았습니다. 앱 Secrets 에 서비스 계정 키와 EDIT_PASSWORD 를 넣어야 합니다.")
         return False
-    if st.session_state.get("edit_ok"):
+    if st.session_state.get("edit_ok") or _cookie_ok():
+        st.session_state["edit_ok"] = True
+        if st.session_state.pop("edit_set_cookie", False):  # 방금 로그인했으면 이 기기에 기억을 남긴다
+            import streamlit.components.v1 as components
+            components.html(
+                f"<script>document.cookie='edit_tok={_tok()}; max-age=2592000; path=/; SameSite=Lax'"
+                "+(location.protocol==='https:'?'; Secure':'')</script>", height=0)
         return True
-    pw = st.text_input("비밀번호", type="password", key="edit_pw")
+    pw = st.text_input("비밀번호 (한 번 넣으면 이 기기에 30일 기억됩니다)", type="password", key="edit_pw")
+    if st.query_params.get("dbg"):  # 로그인 기억이 서버에 오는지 확인용
+        st.caption(f"쿠키 이름: {list(st.context.cookies.keys())}")
     if pw:
         if pw == str(_secret("EDIT_PASSWORD")):
             st.session_state["edit_ok"] = True
+            st.session_state["edit_set_cookie"] = True
             st.rerun()
         st.error("비밀번호가 맞지 않습니다.")
     return False
@@ -269,8 +296,42 @@ def _tab(title, header, create=False):
     return ws, vals, {n: i for i, n in enumerate(vals[0])}
 
 
+def _migrate_manual(ws, vals, h):
+    """예전 형식(코드 칸 없이 종목명만)의 관심종목 탭을 새 형식으로 옮긴다. 이름은 DB 종목목록에서 찾고(대소문자 무시),
+    같은 종목은 합친다. 찾지 못한 이름이 있으면 아무것도 바꾸지 않고 ValueError."""
+    by = {}
+    for u in db.universe():
+        by.setdefault(u["name"].casefold(), []).append(u["code"])
+    names = db.universe_names()
+    out, lost = {}, []
+    for r in vals[1:]:
+        g = lambda f: r[h[f]].strip() if f in h and h[f] < len(r) else ""
+        if not g("name"):
+            continue
+        codes = by.get(g("name").casefold(), [])
+        if len(codes) != 1:
+            lost.append(g("name"))
+            continue
+        cur = out.setdefault(codes[0], {"theme": [], "comment": [], "added": g("added")})
+        cur["theme"] += [t for t in db.split_themes(g("theme")) if t not in cur["theme"]]
+        if g("comment") and g("comment") not in cur["comment"]:
+            cur["comment"].append(g("comment"))
+        cur["added"] = min(x for x in (cur["added"], g("added")) if x) if (cur["added"] or g("added")) else ""
+    if lost:
+        raise ValueError(f"관심종목 탭의 옛 항목을 DB 종목에서 찾지 못했습니다: {', '.join(lost[:5])}")
+    new = [MANUAL_HEAD] + [[c, names[c], ", ".join(d["theme"]), " / ".join(d["comment"]), d["added"]]
+                           for c, d in out.items()]
+    ws.clear()
+    ws.update(range_name=f"A1:E{len(new)}", values=new, value_input_option="RAW")
+
+
 def _manual(create=False):
-    return _tab(MANUAL_TAB, MANUAL_HEAD, create)
+    ws, vals, h = _tab(MANUAL_TAB, MANUAL_HEAD, create)
+    if ws is not None and vals and "code" not in h and "name" in h:  # 예전 형식이면 새 형식으로 옮기고 다시 읽는다
+        _migrate_manual(ws, vals, h)
+        vals = ws.get_all_values()
+        h = {n: i for i, n in enumerate(vals[0])}
+    return ws, vals, h
 
 
 def _cell(r, h, f):
@@ -424,38 +485,44 @@ def _registry_replace(old, to):
 
 
 def theme_box(key="new_theme"):
-    """'➕ 새 테마 추가' 상자. 등록하면 화면을 새로 그려 선택 목록에 바로 나오게 한다."""
-    if st.session_state.get("theme_msg"):
-        st.success(st.session_state.pop("theme_msg"))
-    with st.expander("➕ 새 테마 추가"):
-        with st.form(f"{key}_form", clear_on_submit=True):
-            name = st.text_input("새 테마 이름", key=f"{key}_name", placeholder="테마 이름 (하나만, 쉼표 없이)")
-            go = st.form_submit_button("추가", use_container_width=True)
-        if go:
-            try:
-                added = add_theme(name)
-            except ValueError as e:
-                st.error(str(e))
-            except Exception as e:
-                st.error(f"추가하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
-            else:
-                st.session_state["theme_msg"] = f"테마를 추가했습니다: {added}"
-                st.rerun()
+    """'➕ 새 테마' 입력 칸. 이름을 쓰고 Enter 를 누르면 바로 테마목록에 들어가고, 선택 목록에 바로 나온다."""
+    def done():
+        name = st.session_state.get(key, "")
+        if not name.strip():
+            return
+        try:
+            st.toast(f"테마를 추가했습니다: {add_theme(name)}", icon="✅")
+            st.session_state[key] = ""
+        except ValueError as e:
+            st.toast(str(e), icon="⚠️")
+        except Exception as e:
+            st.toast(f"추가하지 못했습니다: {type(e).__name__}: {str(e)[:100]}", icon="⚠️")
+
+    st.text_input("➕ 새 테마 (이름을 쓰고 Enter)", key=key, on_change=done, placeholder="새 테마 이름")
 
 
-def stock_picker(label, key, exclude=()):
-    """DB 종목목록에서 이름·코드를 검색해 여러 종목을 고른다(form 안에서 부른다). 고른 코드 목록을 돌려준다.
-    reset_picker(key) 를 부르면 선택이 비워진다."""
-    names = {u["code"]: u for u in db.universe()}
-    skip = set(exclude)
-    opts = [c for c in names if c not in skip]
-    return st.multiselect(label, opts, key=f"{key}_{st.session_state.get(key + '_n', 0)}",
-                          format_func=lambda c: f"{names[c]['name']}  {c}  {names[c]['market']}",
-                          placeholder="이름이나 코드로 검색해서 고르세요")
+def pick_stock(key, theme="", label="➕ 종목 추가"):
+    """DB 종목목록에서 이름·코드를 검색해 고르면 바로 관심종목에 넣는다(theme 이 있으면 그 테마도 붙인다). 추가 버튼은 없다."""
+    uni = {u["code"]: u for u in db.universe()}
+    if not uni:
+        st.info("종목 목록(amount 시트 종목목록 탭)을 읽지 못했습니다. 컴퓨터에서 lists_sync.py 가 한 번 돌아야 합니다.")
+        return
+    have = {m["code"] for m in db.manual_stocks() if not theme or theme in db.split_themes(m["theme"])}
 
+    def done():
+        code = st.session_state.get(key)
+        if not code:
+            return
+        try:
+            add_to_interest([code], theme)
+            st.toast(f"{uni[code]['name']} 추가했습니다" + (f" → {theme}" if theme else " → 관심종목"), icon="✅")
+        except Exception as e:
+            st.toast(f"추가하지 못했습니다: {str(e)[:100]}", icon="⚠️")
+        st.session_state[key] = None  # 다음 종목을 바로 고를 수 있게 비운다
 
-def reset_picker(key):
-    st.session_state[key + "_n"] = st.session_state.get(key + "_n", 0) + 1
+    st.selectbox(label, [c for c in uni if c not in have], index=None, key=key, on_change=done,
+                 format_func=lambda c: f"{uni[c]['name']}  {c}  {uni[c]['market']}",
+                 placeholder="이름이나 코드로 검색해서 고르면 바로 추가됩니다")
 
 
 def save_memo(code, memo):
