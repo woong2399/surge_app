@@ -1,6 +1,7 @@
-"""종목 — 맨 위 목록에서 종목을 고르면 테마, 종목 정보, 메모, 관련 이슈가 나온다. 검색은 목록을 좁힌다."""
+"""종목 — 맨 위 목록에서 종목을 고르면 테마, 종목 정보, 메모, 날짜별 기록(10%↑·거래대금 상위 30 합침)이 나온다."""
 import html
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -39,6 +40,64 @@ if not choice:
 code, name = labels[choice]["code"], labels[choice]["name"]
 card = db.stock_card(code)
 ui.setup(name, code)
+tl = db.stock_timeline(code)
+WD = "월화수목금토일"
+
+
+def badges(e):
+    h, v = e["hist"], e["vol"]
+    out = []
+    if h:
+        out.append("🔺10%↑" if h["grp"] == "surge" else "텔레그램")
+    if v:
+        out.append(f"💰거래대금 {v['rank']:.0f}위" if v["rank"] is not None else "💰거래대금 상위")
+    return out
+
+
+def themes_of(e):
+    out = []
+    for r in (e["hist"], e["vol"]):
+        for t in db.split_themes(r["theme"] if r else ""):
+            if t not in out:
+                out.append(t)
+    return out
+
+
+if st.toggle("✏️ 테마·이슈 입력", key=f"stk_edit_{code}"):
+    import edit
+    if not edit.unlocked():
+        st.stop()
+    if code in db.amount_notes():
+        with st.form(f"memo_form_{code}"):
+            memo = st.text_area("종목 이슈", value=card["amount_memo"], height=120,
+                                placeholder="이 종목의 이슈를 적어 두세요 (amount 시트 종목 탭 memo 칸)")
+            if st.form_submit_button("종목 이슈 저장", type="primary", use_container_width=True):
+                try:
+                    st.success("저장했습니다." if edit.save_memo(code, memo) else "amount 종목 탭에 이 종목 줄이 없습니다.")
+                except Exception as e:
+                    st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
+    items = []
+    for e in tl:
+        fs = [("theme", "테마 (쉼표로 여러 개)", ", ".join(themes_of(e)))]
+        if e["hist"]:
+            fs.append(("telegram", "일지 이슈", e["hist"]["telegram"]))
+        if e["vol"]:
+            fs.append(("reason", "거래대금 이유", e["vol"]["reason"]))
+        items.append({"id": e["date"], "title": " · ".join([e["date"]] + badges(e)), "fields": fs})
+    has = {e["date"]: e for e in tl}
+
+    def on_save(ch):
+        he, ae = {}, {}
+        for d, fs in ch.items():
+            for f, v in fs.items():  # 테마는 그날 있는 시트 모두에, 이슈는 제 칸에
+                if f in ("theme", "telegram") and has[d]["hist"]:
+                    he.setdefault((d, code), {})[f] = v
+                if f in ("theme", "reason") and has[d]["vol"]:
+                    ae.setdefault((d, code), {})[f] = v
+        return edit.save(amount_edits=ae, hist_edits=he)
+
+    edit.form(f"stk_form_{code}", [("날짜별 테마·이슈 · 최신순", items)], on_save)
+    st.stop()
 
 st.markdown("<div class='sec'>테마</div>", unsafe_allow_html=True)
 if card["themes"]:
@@ -47,10 +106,10 @@ else:
     st.markdown("<div class='empty'>아직 입력된 테마가 없습니다.</div>", unsafe_allow_html=True)
 
 events = db.stock_events(code)
-tl = ui.theme_timeline(sorted(events, key=lambda e: e["date"]))
-if tl and len([e for e in events if e["theme"]]) > 1:
+theme_tl = ui.theme_timeline(sorted(events, key=lambda e: e["date"]))
+if theme_tl and len([e for e in events if e["theme"]]) > 1:
     st.markdown("<div class='sec'>테마 변화 · 윤곽선은 새로 나온 테마</div>", unsafe_allow_html=True)
-    st.markdown(tl, unsafe_allow_html=True)
+    st.markdown(theme_tl, unsafe_allow_html=True)
 
 st.markdown("<div class='sec'>종목 정보</div>", unsafe_allow_html=True)
 if card["info"]:
@@ -62,42 +121,31 @@ if card["memo"]:
     st.markdown("<div class='sec'>메모</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='box'>{html.escape(card['memo'])}</div>", unsafe_allow_html=True)
 
-st.markdown("<div class='sec'>관련 이슈(일지) · 최신순</div>", unsafe_allow_html=True)
-if not events:
-    st.markdown("<div class='empty'>일지에 나온 적이 없습니다.</div>", unsafe_allow_html=True)
-for e in events:
-    ui.card(
-        e["date"], pct=e["pct"], meta=ui.amount_text(e["amount_est"]),
-        tag=e["grp"] == "telegram", themes=db.split_themes(e["theme"]),
-        text=e["telegram"], news=e["news"], meta2=ui.flow_line(e),
-    )
-
 if card["amount_info"] or card["amount_memo"]:
-    st.markdown("<div class='sec'>거래대금 메모 (amount 시트)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sec'>종목 이슈</div>", unsafe_allow_html=True)
     body = "\n\n".join(x for x in [card["amount_info"], card["amount_memo"]] if x)
     st.markdown(f"<div class='box'>{html.escape(body)}</div>", unsafe_allow_html=True)
 
-if code in db.amount_notes() and st.toggle("✏️ 종목 이슈 입력", key=f"memo_edit_{code}"):
-    import edit
-    if edit.unlocked():
-        with st.form(f"memo_form_{code}"):
-            memo = st.text_area("종목 이슈", value=card["amount_memo"], height=180,
-                                placeholder="이 종목의 이슈를 적어 두세요 (amount 시트 종목 탭 memo 칸)")
-            if st.form_submit_button("저장", type="primary", use_container_width=True):
-                try:
-                    st.success("저장했습니다." if edit.save_memo(code, memo) else "amount 종목 탭에 이 종목 줄이 없습니다.")
-                except Exception as e:
-                    st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
-
-vols = db.stock_volume_events(code)
-st.markdown(f"<div class='sec'>거래대금 상위 기록 · {len(vols)}번 · 최신순</div>", unsafe_allow_html=True)
-if not vols:
-    st.markdown("<div class='empty'>거래대금 상위 30에 든 적이 없습니다.</div>", unsafe_allow_html=True)
-for v in vols:
-    flow = ui.flow_line(v)
+# 일지(10%↑)와 거래대금 상위 30을 날짜 하나로 합쳐 보여 준다
+n10 = sum(1 for e in tl if e["hist"] and e["hist"]["grp"] == "surge")
+nv = sum(1 for e in tl if e["vol"])
+nb = sum(1 for e in tl if e["vol"] and e["hist"] and e["hist"]["grp"] == "surge")
+st.markdown("<div class='sec'>날짜별 기록 · 최신순</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sum'><b>🔺10%↑ {n10}번</b> · <b>💰거래대금 30위 안 {nv}번</b> · 둘 다 {nb}번</div>",
+            unsafe_allow_html=True)
+if not tl:
+    st.markdown("<div class='empty'>일지나 거래대금 상위에 나온 적이 없습니다.</div>", unsafe_allow_html=True)
+for e in tl:
+    h, v = e["hist"], e["vol"]
+    d = e["date"]
+    wd = WD[datetime.strptime(d, "%Y-%m-%d").weekday()]
+    size = f"거래대금 {ui.eok_text(v['amount'])}" if v else ui.amount_text(h["amount_est"])
+    flow = ui.flow_line(v or h)
+    if v and flow:
+        flow = flow.split(" · ", 1)[1]  # 순위는 표시에 있으니 뺀다
+    text = "\n".join(x for x in [h["telegram"] if h else "", f"거래대금 이유: {v['reason']}" if v and v["reason"] else ""] if x)
     ui.card(
-        ("👑 " if v["leader"] else "") + v["date"], pct=v["pct"],
-        meta=" · ".join(x for x in [f"{v['rank']:.0f}위" if v["rank"] is not None else "",
-                                     f"거래대금 {ui.eok_text(v['amount'])}", ui.cap_text(v)] if x),
-        meta2=flow.split(" · ", 1)[1] if flow else "", themes=db.split_themes(v["theme"]), text=v["reason"],
+        ("👑 " if v and v["leader"] else "") + f"{d} ({wd})", pct=h["pct"] if h else v["pct"],
+        meta=" · ".join(badges(e) + [x for x in [size, ui.cap_text(v) if v else ""] if x]),
+        meta2=flow, themes=themes_of(e), text=text, news=h["news"] if h else "",
     )

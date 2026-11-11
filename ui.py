@@ -15,42 +15,51 @@ CSS = """<style>
   --line:rgba(128,128,128,.28); --soft:rgba(128,128,128,.07); --mute:rgba(128,128,128,.95);
 }
 @media (prefers-color-scheme: dark){ :root{ --up:#ff6b5e; --up-bg:rgba(255,107,94,.16); --chip-fg:#8db4ff; --chip-bg:rgba(110,160,255,.18); } }
-.block-container{padding:4.5rem 1rem 4rem;max-width:720px}
+.block-container{padding:3.2rem .75rem 3rem;max-width:760px}
 header[data-testid="stHeader"]{background:transparent}
-.hd{margin:0 0 .6rem}
-.hd .t{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin:0}
-.hd .s{color:var(--mute);font-size:14px;margin-top:2px}
-.c{position:relative;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px;background:var(--soft)}
-.c-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+/* 한 화면에 많이 보이게: 글씨·간격을 작게 (사용자 요청 2026-11-11) */
+.stApp [data-testid="stVerticalBlock"]{gap:.45rem}
+.stApp [data-testid="stMarkdownContainer"] p,.stApp label,.stApp input,.stApp textarea,.stApp [data-baseweb="select"] *{font-size:13px}
+.stApp [data-testid="stTextInput"] input{padding:5px 9px}
+.stApp [data-baseweb="select"] > div{min-height:34px}
+.stApp [data-testid="stFormSubmitButton"] button,.stApp .stButton button{min-height:34px;padding:2px 12px}
+.hd{margin:0 0 .3rem}
+.hd .t{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin:0}
+.hd .s{color:var(--mute);font-size:12px;margin-top:1px}
+.c{position:relative;border:1px solid var(--line);border-radius:10px;padding:7px 11px;margin:0 0 6px;background:var(--soft)}
+.c-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .c-name a.sl{color:inherit;text-decoration:none}
-.c-name a.sl::after{content:'';position:absolute;inset:0;border-radius:14px}
+.c-name a.sl::after{content:'';position:absolute;inset:0;border-radius:10px}
 .c.go{cursor:pointer}.c.go:hover{border-color:var(--chip-fg)}
 .c-news a,.chips{position:relative;z-index:2}
-.c-name{font-size:18px;font-weight:700;letter-spacing:-.01em;min-width:0}
-.c-code{font-size:12px;color:var(--mute);font-weight:500;margin-left:6px}
-.pct{flex:none;font-size:16px;font-weight:800;color:var(--up);background:var(--up-bg);border-radius:999px;padding:3px 11px;font-variant-numeric:tabular-nums}
-.c-meta{margin-top:3px;font-size:12.5px;color:var(--mute);white-space:pre-line}
+.c-name{font-size:14.5px;font-weight:700;letter-spacing:-.01em;min-width:0}
+.c-code{font-size:11px;color:var(--mute);font-weight:500;margin-left:5px}
+.pct{flex:none;font-size:12.5px;font-weight:800;color:var(--up);background:var(--up-bg);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+.c-meta{margin-top:1px;font-size:11.5px;line-height:1.45;color:var(--mute);white-space:pre-line}
 .pct.dn{color:#2f6fe0;background:rgba(47,111,224,.13)}
-.grp{margin:24px 0 8px;padding:10px 14px;border-radius:12px;background:var(--chip-bg)}
-.grp .gt{font-size:17px;font-weight:800;color:var(--chip-fg)}
-.grp .gs{font-size:13px;color:var(--mute);margin-top:2px}
-.chips{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
-.chip{font-size:14.5px;font-weight:650;color:var(--chip-fg);background:var(--chip-bg);border-radius:999px;padding:4px 12px;line-height:1.35}
-.trow{display:flex;gap:10px;align-items:flex-start;margin:6px 0}
-.trow .d{flex:none;width:5.2em;font-size:13px;color:var(--mute);padding-top:6px;font-variant-numeric:tabular-nums}
+.grp{margin:14px 0 5px;padding:5px 10px;border-radius:8px;background:var(--chip-bg);display:flex;align-items:baseline;gap:8px}
+.grp .gt{font-size:14px;font-weight:800;color:var(--chip-fg)}
+.grp .gs{font-size:11.5px;color:var(--mute)}
+.chips{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:11.5px;font-weight:650;color:var(--chip-fg);background:var(--chip-bg);border-radius:999px;padding:1px 8px;line-height:1.4}
+.trow{display:flex;gap:8px;align-items:flex-start;margin:3px 0}
+.trow .d{flex:none;width:4.6em;font-size:11.5px;color:var(--mute);padding-top:2px;font-variant-numeric:tabular-nums}
 .trow .chips{margin-top:0}
-.chip.new{outline:2px solid var(--chip-fg);outline-offset:-2px}
-.tag{display:inline-block;font-size:11px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--mute);margin-left:6px;vertical-align:2px}
-.c-txt{margin-top:10px;font-size:15px;line-height:1.65}
-.c-news{margin-top:8px;display:flex;flex-direction:column;gap:4px}
-.c-news a, .c-news span{font-size:14px;line-height:1.5;text-decoration:none}
+.chip.new{outline:1.5px solid var(--chip-fg);outline-offset:-1.5px}
+.tag{display:inline-block;font-size:10px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:0 6px;color:var(--mute);margin-left:5px;vertical-align:1px}
+.c-txt{margin-top:4px;font-size:12.5px;line-height:1.5;white-space:pre-line}
+.c-news{margin-top:3px;display:flex;flex-direction:column;gap:2px}
+.c-news a, .c-news span{font-size:12px;line-height:1.45;text-decoration:none}
 .c-news a{color:var(--chip-fg)}
-.c-news a::before, .c-news span::before{content:"뉴스";font-size:10.5px;font-weight:700;color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-right:6px}
-.dh{margin:22px 0 8px;font-size:15px;font-weight:700;color:var(--mute)}
-.box{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:6px 0 14px;font-size:15px;line-height:1.65;white-space:pre-wrap;background:var(--soft)}
-.sec{margin:20px 0 6px;font-size:13px;font-weight:700;color:var(--mute);letter-spacing:.02em}
-.empty{color:var(--mute);font-size:14.5px;margin:2px 0 8px}
-section[data-testid="stSidebar"] label{font-size:14.5px}
+.c-news a::before, .c-news span::before{content:"뉴스";font-size:9.5px;font-weight:700;color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:0 3px;margin-right:5px}
+.dh{margin:14px 0 5px;font-size:13px;font-weight:700;color:var(--mute)}
+.box{border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin:3px 0 8px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;background:var(--soft)}
+.sec{margin:12px 0 3px;font-size:11.5px;font-weight:700;color:var(--mute);letter-spacing:.02em}
+.sum{font-size:12px;margin:0 0 6px}
+.ft{font-size:12.5px;font-weight:650;line-height:1.4;margin:6px 0 0}
+.stApp [data-testid="stMarkdownContainer"]:has(> .ft){margin-bottom:0}
+.empty{color:var(--mute);font-size:12.5px;margin:2px 0 6px}
+section[data-testid="stSidebar"] label{font-size:13px}
 </style>"""
 
 

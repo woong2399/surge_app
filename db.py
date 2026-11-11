@@ -188,13 +188,27 @@ def stock_events(code):
     return sorted((r for r in history() if r["code"] == code), key=lambda r: r["date"], reverse=True)
 
 
-def all_themes():
-    seen = set()
+def stock_timeline(code):
+    """한 종목의 날짜별 기록: 일지(10%↑·텔레그램)와 거래대금 상위 30을 날짜 하나로 합친다.
+    [{date, hist: 이력 줄 또는 None, vol: 거래대금상위 줄 또는 None}] 최신순."""
+    by = {}
     for r in history():
+        if r["code"] == code:
+            by.setdefault(r["date"], {})["hist"] = r
+    for r in volume():
+        if r["code"] == code:
+            by.setdefault(r["date"], {})["vol"] = r
+    return [{"date": d, "hist": v.get("hist"), "vol": v.get("vol")} for d, v in sorted(by.items(), reverse=True)]
+
+
+def all_themes():
+    """일지 이력과 거래대금상위에 적힌 테마 전부."""
+    seen = set()
+    for r in history() + volume():
         seen.update(split_themes(r["theme"]))
     return sorted(seen)
 
 
 def theme_events(theme):
-    rows = [r for r in history() if theme in split_themes(r["theme"])]
-    return sorted(rows, key=lambda r: (r["date"], r["pct"]), reverse=True)
+    rows = [r for r in history() + volume() if theme in split_themes(r["theme"])]
+    return sorted(rows, key=lambda r: (r["date"], r["pct"] or 0), reverse=True)

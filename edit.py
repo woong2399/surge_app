@@ -1,4 +1,4 @@
-"""amount 시트에 쓰기 — 거래대금상위의 theme·reason, 종목 탭의 memo.
+"""시트에 쓰기 — amount 시트 거래대금상위의 theme·reason, 종목 탭의 memo, surge 시트(일지) 이력의 theme·telegram.
 
 필요한 것 (Streamlit Cloud → 앱 Settings → Secrets 에 사용자가 직접 넣는다. 코드·GitHub 에는 없다):
   EDIT_PASSWORD = "..."            # 입력 화면을 여는 비밀번호
@@ -70,49 +70,152 @@ def _ws(tab):
     return _client().open_by_key(db.AMOUNT_SHEET_ID).worksheet(tab)
 
 
-def save_day(day, edits):
-    """edits = {code: {"theme": .., "reason": ..}}. 바뀐 칸만 쓴다. 같은 종목의 다른 날짜 빈 테마는,
-    그 종목 테마가 한 가지뿐이면 그 값으로 채운다(시트·옵시디언과 같은 규칙). 쓴 칸 수를 돌려준다."""
-    from gspread.utils import rowcol_to_a1
-    ws = _ws("거래대금상위")
+def _clean(v):
+    """칸에 넣을 글자: 공백 정리, 'null' 은 빈 칸."""
+    v = " ".join((v or "").split())
+    return "" if v.lower() == "null" else v
+
+
+def _same(f, old):
+    """비교용 원래 값. 이력 telegram 칸은 앞의 '* ' 표시를 떼고 본다(화면도 떼고 보여 준다)."""
+    old = old.strip()
+    return old.removeprefix("* ") if f == "telegram" else old
+
+
+def _load(sid, tab):
+    ws = _client().open_by_key(sid).worksheet(tab)
     vals = ws.get_all_values()
-    h = {n: i for i, n in enumerate(vals[0])}
-    upd = {}
-    for i, r in enumerate(vals[1:], start=2):
-        e = edits.get(r[h["code"]]) if r[h["date"]] == day else None
-        if not e:
-            continue
-        for f in ("theme", "reason"):
-            new = " ".join((e.get(f) or "").split())
-            if new.lower() == "null":
-                new = ""
-            if new != r[h[f]].strip():
-                upd[(i, f)] = new
-                r[h[f]] = new
-    known = {}
-    for r in vals[1:]:
-        if r[h["theme"]].strip():
-            known.setdefault(r[h["code"]], set()).add(r[h["theme"]].strip())
-    for i, r in enumerate(vals[1:], start=2):
-        c = r[h["code"]]
-        if r[h["code"]] in edits and not r[h["theme"]].strip() and len(known.get(c, ())) == 1:
-            upd[(i, "theme")] = next(iter(known[c]))
+    return ws, vals, {n: i for i, n in enumerate(vals[0])}
+
+
+def _write(ws, h, upd):
+    from gspread.utils import rowcol_to_a1
     if upd:
         ws.batch_update([{"range": rowcol_to_a1(i, h[f] + 1), "values": [[v]]} for (i, f), v in upd.items()],
                         value_input_option="RAW")
-    # 일지(surge 시트 이력)의 같은 날·같은 종목 테마가 비어 있으면 같이 채운다 (빈 칸만, 사용자 결정 2026-11-11)
-    themes = {r[h["code"]]: r[h["theme"]].strip() for r in vals[1:] if r[h["date"]] == day and r[h["code"]] in edits}
-    hws = _client().open_by_key(db.sheet_id()).worksheet("이력")
-    hv = hws.get_all_values()
-    hh = {n: i for i, n in enumerate(hv[0])}
-    hist = [{"range": rowcol_to_a1(j, hh["theme"] + 1), "values": [[themes[r[hh["code"]]]]]}
-            for j, r in enumerate(hv[1:], start=2)
-            if r[hh["date"]] == day and themes.get(r[hh["code"]]) and not r[hh["theme"]].strip()]
-    if hist:
-        hws.batch_update(hist, value_input_option="RAW")
-    if upd or hist:
+
+
+def _apply(vals, h, edits, upd):
+    """edits = {(date, code): {칸 제목: 값}}. 바뀐 칸만 upd[(줄, 칸)] 에 넣고 vals 도 고친다."""
+    for i, r in enumerate(vals[1:], start=2):
+        e = edits.get((r[h["date"]], r[h["code"]]))
+        for f, v in (e or {}).items():
+            if f not in h:
+                continue
+            new = _clean(v)
+            if new == _same(f, r[h[f]]):
+                continue
+            if f == "telegram" and new and r[h[f]].strip().startswith("* "):
+                new = "* " + new  # 원래 있던 표시는 그대로 둔다
+            upd[(i, f)] = r[h[f]] = new
+
+
+def save(amount_edits=None, hist_edits=None):
+    """amount_edits: 거래대금상위 {(date, code): {"theme", "reason"}}, hist_edits: 일지 이력 {(date, code): {"theme", "telegram"}}.
+    바뀐 칸만 쓰고, 빈 테마 칸은 이렇게 채운다(사용자 결정 2026-11-11, 빈 칸만):
+      · 거래대금상위: 고친 종목의 테마가 한 가지뿐이면 그 종목의 다른 날짜 빈 칸
+      · 같은 날·같은 종목: 거래대금상위 ↔ 일지 이력 서로
+    방금 직접 고친 칸은 채우기로 덮지 않는다(null 로 비운 칸이 다시 차지 않게). 쓴 칸 수를 돌려준다."""
+    amount_edits, hist_edits = amount_edits or {}, hist_edits or {}
+    aws, av, ah = _load(db.AMOUNT_SHEET_ID, "거래대금상위")
+    hws, hv, hh = _load(db.sheet_id(), "이력")
+    au, hu = {}, {}
+    _apply(av, ah, amount_edits, au)
+    _apply(hv, hh, hist_edits, hu)
+    mine_a, mine_h = set(au), set(hu)
+    keys = set(amount_edits) | set(hist_edits)
+    codes = {c for _, c in keys}
+
+    known = {}
+    for r in av[1:]:
+        if r[ah["theme"]].strip():
+            known.setdefault(r[ah["code"]], set()).add(r[ah["theme"]].strip())
+    for i, r in enumerate(av[1:], start=2):
+        c = r[ah["code"]]
+        if c in codes and not r[ah["theme"]].strip() and len(known.get(c, ())) == 1 and (i, "theme") not in mine_a:
+            au[(i, "theme")] = r[ah["theme"]] = next(iter(known[c]))
+
+    arow = {(r[ah["date"]], r[ah["code"]]): (i, r) for i, r in enumerate(av[1:], start=2)}
+    hrow = {(r[hh["date"]], r[hh["code"]]): (i, r) for i, r in enumerate(hv[1:], start=2)}
+    for k in keys:
+        if k in arow and k in hrow:
+            (ai, ar), (hi, hr) = arow[k], hrow[k]
+            a, b = ar[ah["theme"]].strip(), hr[hh["theme"]].strip()
+            if a and not b and (hi, "theme") not in mine_h:
+                hu[(hi, "theme")] = hr[hh["theme"]] = a
+            elif b and not a and (ai, "theme") not in mine_a:
+                au[(ai, "theme")] = ar[ah["theme"]] = b
+
+    _write(aws, ah, au)
+    _write(hws, hh, hu)
+    if au or hu:
         st.cache_data.clear()
-    return len(upd) + len(hist)
+    return len(au) + len(hu)
+
+
+def rename_theme(old, new):
+    """두 시트(거래대금상위·일지 이력)의 모든 칸에서 테마 old 를 new 로 바꾼다. new 는 쉼표로 여러 개도 된다.
+    이미 같은 테마가 있는 칸은 겹치지 않게 한 번만 둔다. 쓴 칸 수를 돌려준다."""
+    to = db.split_themes(_clean(new))
+    if not to:
+        raise ValueError("새 테마 이름이 비었습니다")
+    n = 0
+    for sid, tab in ((db.AMOUNT_SHEET_ID, "거래대금상위"), (db.sheet_id(), "이력")):
+        ws, vals, h = _load(sid, tab)
+        upd = {}
+        for i, r in enumerate(vals[1:], start=2):
+            ts = db.split_themes(r[h["theme"]])
+            if old not in ts:
+                continue
+            out = []
+            for t in ts:
+                for x in (to if t == old else [t]):
+                    if x not in out:
+                        out.append(x)
+            v = ", ".join(out)
+            if v != r[h["theme"]].strip():
+                upd[(i, "theme")] = v
+        _write(ws, h, upd)
+        n += len(upd)
+    if n:
+        st.cache_data.clear()
+    return n
+
+
+def form(key, sections, on_save):
+    """입력 칸 묶음. sections = [(제목, [{"id", "title", "fields": [(칸, 안내 글자, 지금 값)]}])].
+    저장을 누르면 바뀐 칸만 on_save({id: {칸: 새 값}}) 로 넘기고, 돌려받은 쓴 칸 수를 보여 준다."""
+    import html
+    with st.form(key):
+        for title, items in sections:
+            if not items:
+                continue
+            if title:
+                st.markdown(f"<div class='sec'>{html.escape(title)}</div>", unsafe_allow_html=True)
+            for it in items:
+                st.markdown(f"<div class='ft'>{html.escape(it['title'])}</div>", unsafe_allow_html=True)
+                fs = it["fields"]
+                cols = st.columns([1] + [1.4] * (len(fs) - 1)) if len(fs) > 1 else [st]
+                for col, (f, ph, v) in zip(cols, fs):
+                    col.text_input(ph, value=v or "", key=f"{key}|{it['id']}|{f}", placeholder=ph,
+                                   label_visibility="collapsed")
+        if not st.form_submit_button("저장", type="primary", use_container_width=True):
+            return
+    ch = {}
+    for _, items in sections:
+        for it in items:
+            for f, _ph, v in it["fields"]:
+                new = st.session_state.get(f"{key}|{it['id']}|{f}", v or "")
+                if " ".join(new.split()) != " ".join((v or "").split()):
+                    ch.setdefault(it["id"], {})[f] = new
+    if not ch:
+        st.info("바뀐 칸이 없습니다.")
+        return
+    try:
+        n = on_save(ch)
+        st.success(f"저장했습니다 · 바뀐 칸 {n}개" if n else "바뀐 칸이 없습니다.")
+    except Exception as e:
+        st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
 
 
 def save_memo(code, memo):

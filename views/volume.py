@@ -63,27 +63,14 @@ if st.toggle("✏️ 테마·이슈 입력", key="vol_edit"):
     order = lambda r: (r["pct"] is not None, -(r["pct"] or 0))
     new = sorted([r for r in all_rows if r["code"] not in prev_codes], key=order)
     cont = sorted([r for r in all_rows if r["code"] in prev_codes], key=order)
-    with st.form(f"vol_form_{day}"):
-        for title, rs in ((f"신규 진입 · {len(new)}종목", new), (f"이어서 든 종목 · {len(cont)}종목", cont)):
-            if not rs:
-                continue
-            st.markdown(f"<div class='sec'>{title}</div>", unsafe_allow_html=True)
-            for r in rs:
-                pct = "신규" if r["pct"] is None else f"{r['pct']:+.2f}%"
-                st.markdown(f"**{html.escape(r['name'])}** · {pct}")
-                a, b = st.columns([1, 1.4])
-                a.text_input("테마", value=r["theme"], key=f"vt_{day}_{r['code']}", placeholder="테마 (쉼표로 여러 개)",
-                             label_visibility="collapsed")
-                b.text_input("이슈", value=r["reason"], key=f"vr_{day}_{r['code']}", placeholder="이슈",
-                             label_visibility="collapsed")
-        if st.form_submit_button("저장", type="primary", use_container_width=True):
-            edits = {r["code"]: {"theme": st.session_state[f"vt_{day}_{r['code']}"],
-                                 "reason": st.session_state[f"vr_{day}_{r['code']}"]} for r in all_rows}
-            try:
-                n = edit.save_day(day, edits)
-                st.success(f"저장했습니다 · 바뀐 칸 {n}개" if n else "바뀐 칸이 없습니다.")
-            except Exception as e:
-                st.error(f"저장하지 못했습니다: {type(e).__name__}: {str(e)[:200]}")
+    def item(r):
+        pct = "신규" if r["pct"] is None else f"{r['pct']:+.2f}%"
+        return {"id": (day, r["code"]), "title": f"{r['name']} · {pct}",
+                "fields": [("theme", "테마 (쉼표로 여러 개)", r["theme"]), ("reason", "이슈", r["reason"])]}
+    edit.form(f"vol_form_{day}",
+              [(f"신규 진입 · {len(new)}종목", [item(r) for r in new]),
+               (f"이어서 든 종목 · {len(cont)}종목", [item(r) for r in cont])],
+              lambda ch: edit.save(amount_edits=ch))
     st.caption("같은 종목의 다른 날짜와 일지(이력)의 같은 날 빈 테마 칸도 같이 채워집니다. 옵시디언 노트에는 이 컴퓨터에서 동기화가 돌 때 들어갑니다.")
     st.stop()
 if not rows:
