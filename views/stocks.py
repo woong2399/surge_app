@@ -126,13 +126,8 @@ if card["amount_info"] or card["amount_memo"]:
     body = "\n\n".join(x for x in [card["amount_info"], card["amount_memo"]] if x)
     st.markdown(f"<div class='box'>{html.escape(body)}</div>", unsafe_allow_html=True)
 
-# 일지(10%↑)와 거래대금 상위 30을 날짜 하나로 합쳐 보여 준다
-n10 = sum(1 for e in tl if e["hist"] and e["hist"]["grp"] == "surge")
-nv = sum(1 for e in tl if e["vol"])
-nb = sum(1 for e in tl if e["vol"] and e["hist"] and e["hist"]["grp"] == "surge")
+# 일지(10%↑)와 거래대금 상위 30을 날짜 하나로 합쳐 보여 준다 (카드마다 표시가 붙어 있어 횟수 요약은 두지 않는다)
 st.markdown("<div class='sec'>날짜별 기록 · 최신순</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='sum'><b>🔺10%↑ {n10}번</b> · <b>💰거래대금 30위 안 {nv}번</b> · 둘 다 {nb}번</div>",
-            unsafe_allow_html=True)
 if not tl:
     st.markdown("<div class='empty'>일지나 거래대금 상위에 나온 적이 없습니다.</div>", unsafe_allow_html=True)
 for e in tl:
